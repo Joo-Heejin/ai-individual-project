@@ -750,7 +750,7 @@ if not st.session_state.get("fetch_triggered", False):
             <h1>기업 리스크 검증</h1>
             <p>재무제표 정량 분석과 주석 정성 검증으로 기업의 투명성과 잠재 리스크를 종합 평가합니다.</p>
         </div>
-        """, unsafe_allow_html=True, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
         col_input, col_btn = st.columns([0.7, 0.3], gap="small")
 
