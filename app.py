@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-이해관계자 관점의 기업 리스크 탐지 시스템 - 웹 인터페이스
-(Stakeholder-Perspective Enterprise Risk Detection System - Web Interface)
+기업 정량·정성 복합 리스크 검증 시스템 - 웹 인터페이스
+(Enterprise Risk Detection System - Web Interface)
 
-학회 발표용 전문 금융·회계 분석 플랫폼
+전문 금융·회계 분석 플랫폼
 """
 
 import os
@@ -18,7 +18,6 @@ import OpenDartReader
 import pandas as pd
 from datetime import datetime
 
-# UTF-8 설정
 sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv(".env")
 
@@ -28,9 +27,9 @@ load_dotenv(".env")
 
 st.set_page_config(
     page_title="Enterprise Risk Detection System",
-    page_icon="📊",
+    page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 st.markdown("""
@@ -46,7 +45,6 @@ st.markdown("""
         color: #1b3a2a;
     }
 
-    /* 데코 블롭 효과 */
     .deco-blob-1 {
         position: fixed;
         top: -50px;
@@ -73,39 +71,12 @@ st.markdown("""
         pointer-events: none;
     }
 
-    /* 히어로 배너 */
-    .hero-banner {
-        background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
-        color: white;
-        padding: 40px 30px;
-        border-radius: 24px;
-        margin-bottom: 30px;
-        box-shadow: 0 8px 32px rgba(27, 67, 50, 0.15);
-        text-align: center;
-    }
-
-    .hero-banner h1 {
-        font-size: 2.2em;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: -0.5px;
-    }
-
-    .hero-banner p {
-        font-size: 1.1em;
-        margin: 12px 0 0 0;
-        opacity: 0.95;
-        font-weight: 400;
-    }
-
-    /* 사이드바 스타일 */
     [data-testid="stSidebar"] {
         background: rgba(232, 245, 233, 0.7) !important;
         backdrop-filter: blur(16px);
         border-right: 1px solid #c8e6c9;
     }
 
-    /* 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         border-bottom: 2px solid #a5d6a7;
@@ -122,7 +93,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* 분석 카드 */
     .analysis-card {
         background: rgba(255, 255, 255, 0.85);
         padding: 24px;
@@ -134,16 +104,15 @@ st.markdown("""
         backdrop-filter: blur(10px);
     }
 
-    /* 섹션 헤더 */
     .section-header {
         border-left: 4px solid #1b4332;
         padding-left: 16px;
         margin: 24px 0 16px 0;
         font-weight: 600;
         color: #1b4332;
+        font-size: 1.1em;
     }
 
-    /* 메트릭 카드 */
     .metric-card {
         background: linear-gradient(135deg, #40916c 0%, #2d6a4f 100%);
         color: white;
@@ -153,12 +122,10 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(27, 67, 50, 0.2);
     }
 
-    /* 컨테이너 스타일 */
     [data-testid="stVerticalBlock"] > [data-testid="stContainer"] {
         border-radius: 16px;
     }
 
-    /* 위험도 색상 */
     .risk-high {
         color: #c41c3b;
         font-weight: 700;
@@ -174,14 +141,12 @@ st.markdown("""
         font-weight: 700;
     }
 
-    /* 아코디언 스타일 */
     [data-testid="stExpander"] {
         border: 1px solid #a5d6a7 !important;
         border-radius: 12px !important;
         background: rgba(232, 245, 233, 0.3) !important;
     }
 
-    /* 버튼 스타일 */
     .stButton > button {
         background: linear-gradient(135deg, #40916c 0%, #2d6a4f 100%);
         color: white;
@@ -189,21 +154,19 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
         padding: 10px 20px;
+        font-size: 1.05em;
     }
 
     .stButton > button:hover {
         background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
     }
 
-    /* 성공/경고 메시지 */
     .stSuccess {
-        background: rgba(76, 175, 80, 0.1);
-        border-left: 4px solid #2e7d32;
+        display: none;
     }
 
     .stWarning {
-        background: rgba(255, 152, 0, 0.1);
-        border-left: 4px solid #f57c00;
+        display: none;
     }
 
     .stError {
@@ -211,13 +174,11 @@ st.markdown("""
         border-left: 4px solid #c41c3b;
     }
 
-    /* 정보 박스 */
     .stInfo {
         background: rgba(45, 106, 79, 0.05);
         border-left: 4px solid #40916c;
     }
 
-    /* 마크다운 링크 */
     a {
         color: #2d6a4f !important;
         text-decoration: none;
@@ -228,40 +189,58 @@ st.markdown("""
         color: #1b4332 !important;
         text-decoration: underline;
     }
+
+    .conclusion-box {
+        background: linear-gradient(135deg, rgba(27, 67, 50, 0.08) 0%, rgba(45, 106, 79, 0.06) 100%);
+        border-left: 5px solid #1b4332;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        font-weight: 500;
+    }
+
+    h3 {
+        font-size: 1.25em;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+
+    h4 {
+        font-size: 1.1em;
+        margin-top: 15px;
+        margin-bottom: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 데코 블롭 요소 추가
 st.html("""
 <div class="deco-blob-1"></div>
 <div class="deco-blob-2"></div>
 """)
 
 # ============================================================================
-# 초기화: DART API, LLM, 캐시
+# 초기화
 # ============================================================================
 
 @st.cache_resource
 def init_dart_api():
-    """DART API 초기화"""
     dart_api_key = os.getenv("DART_API_KEY")
     if not dart_api_key:
-        st.error("❌ DART_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
+        st.error("DART_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
         st.stop()
 
     try:
         dart = OpenDartReader(dart_api_key)
         return dart
     except Exception as e:
-        st.error(f"❌ DART API 초기화 실패: {e}")
+        st.error(f"DART API 초기화 실패: {e}")
         st.stop()
 
 @st.cache_resource
 def init_llm():
-    """Claude LLM 초기화 (Haiku 모델)"""
     api_key = os.getenv("Anthropic_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        st.error("❌ ANTHROPIC_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
+        st.error("ANTHROPIC_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
         st.stop()
 
     return ChatAnthropic(
@@ -279,7 +258,6 @@ llm = init_llm()
 # ============================================================================
 
 def search_company(dart, company_name: str) -> Tuple[Optional[str], Optional[str]]:
-    """기업명으로 검색"""
     try:
         results = dart.company_by_name(company_name)
         if not results:
@@ -299,7 +277,6 @@ def search_company(dart, company_name: str) -> Tuple[Optional[str], Optional[str
         return None, None
 
 def get_periodic_report(dart, corp_code: str, corp_name: str) -> Tuple[Optional[pd.Series], Optional[str]]:
-    """정기 공시 조회"""
     try:
         all_filings = dart.list(corp=corp_code)
         if all_filings.empty:
@@ -326,7 +303,6 @@ def get_periodic_report(dart, corp_code: str, corp_name: str) -> Tuple[Optional[
         return None, None
 
 def extract_financial_statement(dart, corp_code: str) -> Optional[pd.DataFrame]:
-    """재무제표 추출"""
     try:
         current_year = datetime.now().year
         fs_data = None
@@ -344,7 +320,6 @@ def extract_financial_statement(dart, corp_code: str) -> Optional[pd.DataFrame]:
         return None
 
 def extract_notes(dart, rcept_no: str) -> Optional[str]:
-    """주석 추출"""
     try:
         doc_xml = dart.document(rcept_no)
         if not doc_xml:
@@ -363,7 +338,6 @@ def extract_notes(dart, rcept_no: str) -> Optional[str]:
 # ============================================================================
 
 def find_account_value(data, keywords):
-    """계정값 유연하게 찾기"""
     try:
         if isinstance(data, pd.DataFrame):
             for keyword in keywords:
@@ -391,8 +365,6 @@ def find_account_value(data, keywords):
 # ============================================================================
 
 def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
-    """전문가 수준의 정량 분석"""
-
     risk_scores = {
         "revenue_quality": 0,
         "liquidity_stress": 0,
@@ -401,7 +373,6 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
 
     detailed_analysis = {}
 
-    # 매출 질 평가
     try:
         if financial_df is not None:
             sales = find_account_value(financial_df, ['매출액', '매출', 'revenue'])
@@ -415,25 +386,24 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
 
                 if ar_turnover < 2:
                     revenue_quality_score = 70
-                    detailed_analysis["ar_warning"] = f"⚠️ 매출채권 회전율 저위: {ar_turnover:.2f}배"
+                    detailed_analysis["ar_warning"] = f"매출채권 회전율 저위: {ar_turnover:.2f}배"
                 elif ar_turnover < 4:
                     revenue_quality_score = 50
-                    detailed_analysis["ar_caution"] = f"⚠️ 매출채권 회전율 주의: {ar_turnover:.2f}배"
+                    detailed_analysis["ar_caution"] = f"매출채권 회전율 주의: {ar_turnover:.2f}배"
                 else:
-                    detailed_analysis["ar_quality"] = f"✅ 매출채권 회전율 양호: {ar_turnover:.2f}배"
+                    detailed_analysis["ar_quality"] = f"매출채권 회전율 양호: {ar_turnover:.2f}배"
 
             if ocf is not None:
                 if ocf < 0:
                     revenue_quality_score = max(revenue_quality_score, 85)
-                    detailed_analysis["ocf_warning"] = f"🚨 영업현금흐름 음수: {ocf:,.0f}원"
+                    detailed_analysis["ocf_warning"] = f"영업현금흐름 음수: {ocf:,.0f}원"
                 else:
-                    detailed_analysis["ocf_quality"] = f"✅ 영업현금흐름 양수: {ocf:,.0f}원"
+                    detailed_analysis["ocf_quality"] = f"영업현금흐름 양수: {ocf:,.0f}원"
 
             risk_scores["revenue_quality"] = revenue_quality_score
     except:
         risk_scores["revenue_quality"] = 40
 
-    # 유동성 및 부채 평가
     try:
         if financial_df is not None:
             current_assets = find_account_value(financial_df, ['유동자산'])
@@ -448,12 +418,12 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
 
                 if current_ratio < 100:
                     liquidity_score = 90
-                    detailed_analysis["liquidity_risk"] = f"🚨 단기유동성 압박: {current_ratio:.1f}%"
+                    detailed_analysis["liquidity_risk"] = f"단기유동성 압박: {current_ratio:.1f}%"
                 elif current_ratio < 150:
                     liquidity_score = 60
-                    detailed_analysis["liquidity_caution"] = f"⚠️ 유동성 주의: {current_ratio:.1f}%"
+                    detailed_analysis["liquidity_caution"] = f"유동성 주의: {current_ratio:.1f}%"
                 else:
-                    detailed_analysis["liquidity_healthy"] = f"✅ 유동성 양호: {current_ratio:.1f}%"
+                    detailed_analysis["liquidity_healthy"] = f"유동성 양호: {current_ratio:.1f}%"
 
             risk_scores["liquidity_stress"] = liquidity_score
 
@@ -466,19 +436,18 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
 
                     if debt_ratio > 200:
                         leverage_score = 80
-                        detailed_analysis["leverage_high"] = f"🚨 부채비율 상승: {debt_ratio:.1f}%"
+                        detailed_analysis["leverage_high"] = f"부채비율 상승: {debt_ratio:.1f}%"
                     elif debt_ratio > 160:
                         leverage_score = 50
-                        detailed_analysis["leverage_caution"] = f"⚠️ 부채비율 주의: {debt_ratio:.1f}%"
+                        detailed_analysis["leverage_caution"] = f"부채비율 주의: {debt_ratio:.1f}%"
                     else:
-                        detailed_analysis["leverage_healthy"] = f"✅ 부채비율 정상: {debt_ratio:.1f}%"
+                        detailed_analysis["leverage_healthy"] = f"부채비율 정상: {debt_ratio:.1f}%"
 
             risk_scores["leverage_risk"] = leverage_score
     except:
         risk_scores["liquidity_stress"] = 40
         risk_scores["leverage_risk"] = 40
 
-    # 종합 점수
     financial_risk_score = (
         risk_scores["revenue_quality"] * 0.40 +
         risk_scores["liquidity_stress"] * 0.35 +
@@ -493,12 +462,10 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
     }
 
 # ============================================================================
-# Node 2: 경영진 소명 및 전략적 리포트
+# Node 2: 경영진 설명
 # ============================================================================
 
 def management_explanations(corp_name: str, analysis: dict, notes: str, llm) -> str:
-    """경영진 관점의 소명"""
-
     prompt = f"""당신은 {corp_name}의 경영진 대변인으로, 재무 투명성 및 전략적 의사결정을 설명합니다.
 
 【정량 분석 결과】
@@ -509,89 +476,82 @@ def management_explanations(corp_name: str, analysis: dict, notes: str, llm) -> 
 【재무제표 주석 발췌】
 {notes[:2000] if notes else "주석 없음"}
 
-【소명 내용】
+【설명 내용】
 국제회계기준(K-IFRS)에 따른 당사의 재무 보고를 설명드립니다.
 
 1. **재무 건전성 입증**
-   - 정량 분석 결과의 세부 지표를 근거로 당사의 체계적 재무관리를 소명하십시오.
+   - 정량 분석 결과의 세부 지표를 근거로 당사의 체계적 재무관리를 설명하십시오.
    - 부채비율, 유동비율, 현금흐름 관련 객관적 지표를 명시하십시오.
 
 2. **전략적 자산 취득의 정당화**
-   - 주석에서 언급된 무형자산, 종속기업 투자, 플랫폼 사업을 '미래 성장 동력'으로 정당화하십시오.
+   - 주석에서 언급된 무형자산, 종속기업 투자, 사업을 미래 성장 동력으로 설명하십시오.
    - K-IFRS 회계기준에 따른 보수적 처리 현황을 강조하십시오.
 
 3. **리스크 관리 현황**
    - 당사의 선제적 리스크 관리 체계를 설명하십시오.
    - 회계 투명성 및 기업지배구조 개선 현황을 소명하십시오.
-
-【최종 목표】
-법정 진술인처럼 객관적이고 신뢰할 수 있는 재무 보고를 수행하되,
-K-IFRS 기준 및 주석의 구체적 근거를 인용하여 소명하십시오.
 """
 
     try:
         response = llm.invoke(prompt)
         return response.content
     except:
-        return "재무 소명 생성 중 오류가 발생했습니다."
+        return "재무 설명 생성 중 오류가 발생했습니다."
 
 # ============================================================================
-# Node 3: 잠재 리스크 지적 (감시 관점)
+# Node 3: 정성적 크로스체킹
 # ============================================================================
 
 def stakeholder_caveats(corp_name: str, mgmt_response: str, notes: str, analysis: dict, llm) -> str:
-    """이해관계자 및 감시인 관점의 리스크 지적"""
-
-    prompt = f"""당신은 기업지배구조 및 회계감시 전문가로, 국제 투자자펀드의 의뢰로 {corp_name}의 재무 투명성을 감시합니다.
+    prompt = f"""당신은 기업지배구조 및 회계감시 전문가로, 국제 투자자의 의뢰로 {corp_name}의 재무 투명성을 검증합니다.
 
 【정량 분석 결과】
 - 종합 위험도: {analysis.get('financial_risk_score', 'N/A')}/100
 - 위험 수준: {analysis.get('risk_level', 'N/A')}
 
-【경영진의 소명】
+【경영진의 설명】
 {mgmt_response[:1500]}
 
-【재무제표 주석 전문】
+【재무제표 주석】
 {notes if notes else "주석 없음"}
 
-【감시 및 검증】
+【정성적 검증】
 
-겉보기 재무 건전성에도 불구하고, 주석에 대한 정밀 분석을 수행합니다.
+재무 건전성에도 불구하고, 주석에 대한 정밀 분석을 수행합니다.
 
-**🚨 ① 우발채무 및 계류 중인 소송 사건 (Contingent Liabilities)**
+**① 우발채무 및 계류 중인 소송**
    - 주석에서 진행 중인 소송, 분쟁, 법적 리스크를 추적하십시오.
    - 미결제 우발채무 규모와 해결 시점의 불확실성을 지적하십시오.
-   - 발견 내용: "주석 [◯절. ~]에 명시된 ~건의 소송은..."으로 구체 인용하십시오.
+   - 발견 내용: 구체적으로 인용하십시오.
 
-**🤝 ② 특수관계자 간 거래 및 자금 대여 내역 (Related Party Transactions)**
+**② 특수관계자 거래 및 자금 이동**
    - 주석에서 지배주주, 경영진, 계열사 간의 자금 이동을 추적하십시오.
    - 부당한 거래 가격 책정, 담보 제공, 보증 약정의 투명성을 지적하십시오.
-   - 발견 내용: "주석 [◯절. 특수관계자 거래]에 따르면 ~..."으로 구체 인용하십시오.
+   - 발견 내용: 구체적으로 인용하십시오.
 
-**📉 ③ 종속·관계기업 자산손상차손 및 투자 손실 (Asset Impairment)**
-   - 주석에서 M&A 자산, 무형자산, 투자 관련 손상차손을 추적하십시오.
-   - 과거 인수 기업의 영업 부진, 손상 인식 규모와 진정성을 의문 제기하십시오.
-   - 발견 내용: "주석 [◯절. 자산손상차손]에 따르면 ~..."으로 구체 인용하십시오.
+**③ 자산손상차손 및 투자 손실**
+   - 주석에서 M&A 자산, 무형자산, 투자 관련 손상을 추적하십시오.
+   - 과거 인수 기업의 영업 부진, 손상 인식 규모를 분석하십시오.
+   - 발견 내용: 구체적으로 인용하십시오.
 
-【최종 결론】
+【최종 평가】
 투자자 관점에서:
 - 제시된 위험 요소가 얼마나 심각한가?
 - 추가 공시 또는 감시가 필요한가?
-- 투자 진행 여부에 대한 권고를 제시하십시오. (강력 권고 / 조건부 권고 / 주의 / 권고 유보)
+- 투자 진행 여부에 대한 평가를 명시하십시오.
 """
 
     try:
         response = llm.invoke(prompt)
         return response.content
     except:
-        return "리스크 검증 생성 중 오류가 발생했습니다."
+        return "정성적 검증 생성 중 오류가 발생했습니다."
 
 # ============================================================================
-# 분석 결과 파싱 및 정리 함수
+# 리스크 카테고리 추출
 # ============================================================================
 
 def extract_risk_categories(caveats_text: str) -> dict:
-    """Node 3 출력에서 리스크 카테고리별로 핵심 내용 추출"""
     categories = {
         "contingent_liabilities": [],
         "related_party_transactions": [],
@@ -599,7 +559,6 @@ def extract_risk_categories(caveats_text: str) -> dict:
         "investment_assessment": ""
     }
 
-    # 우발채무 섹션 추출 (더 유연한 패턴)
     contingent_patterns = [
         r'[①1][\.\s]*우발채무.*?(?=[②2]|③3|【|$)',
         r'우발채무.*?(?=특수관계자|자산손상|【|$)',
@@ -612,7 +571,6 @@ def extract_risk_categories(caveats_text: str) -> dict:
             break
 
     if contingent_text:
-        # 주석에서 언급된 구체적인 항목 찾기
         lines = contingent_text.split('\n')
         for line in lines:
             if any(kw in line for kw in ['소송', '건', '억', '만', '우발', '주석', '분쟁', '법적']):
@@ -620,7 +578,6 @@ def extract_risk_categories(caveats_text: str) -> dict:
                 if cleaned and len(cleaned) > 5:
                     categories["contingent_liabilities"].append(cleaned)
 
-    # 특수관계자 거래 섹션 추출
     related_patterns = [
         r'[②2][\.\s]*특수관계자.*?(?=[③3]|【|$)',
         r'특수관계자.*?(?=자산손상|【|$)',
@@ -640,7 +597,6 @@ def extract_risk_categories(caveats_text: str) -> dict:
                 if cleaned and len(cleaned) > 5:
                     categories["related_party_transactions"].append(cleaned)
 
-    # 자산손상차손 섹션 추출
     impair_patterns = [
         r'[③3][\.\s]*자산손상.*?(?=【|$)',
         r'종속.*?기업.*?(?=【|$)',
@@ -661,7 +617,6 @@ def extract_risk_categories(caveats_text: str) -> dict:
                 if cleaned and len(cleaned) > 5:
                     categories["asset_impairment"].append(cleaned)
 
-    # 최종 투자 권고 추출
     final_patterns = [
         r'【최종[\s\S]*?(?:강력|조건부|주의|권고)[\s\S]{0,200}',
         r'투자.*?권고[\s\S]{0,300}',
@@ -673,111 +628,128 @@ def extract_risk_categories(caveats_text: str) -> dict:
             categories["investment_assessment"] = match.group(0)
             break
 
-    # 카테고리별로 중복 제거 및 길이 제한
     for key in ["contingent_liabilities", "related_party_transactions", "asset_impairment"]:
-        categories[key] = list(dict.fromkeys(categories[key]))[:5]  # 중복 제거, 상위 5개만
+        categories[key] = list(dict.fromkeys(categories[key]))[:5]
 
     return categories
 
-
 # ============================================================================
-# Streamlit UI
+# UI - 초기 화면
 # ============================================================================
 
-# 히어로 배너
-st.html("""
-<div class="hero-banner">
-    <h1>🎯 AI 기반 기업 정량·정성 복합 리스크 검증 시스템</h1>
-    <p>Stakeholder-Perspective Enterprise Risk Detection Platform</p>
-</div>
-""")
+col1, col2, col3 = st.columns([1, 2, 1])
 
-# 사이드바: 데이터 수집 설정
+with col2:
+    st.markdown('<h1 style="text-align: center; color: #1b4332; font-size: 2em; margin-bottom: 10px;">기업 리스크 검증 시스템</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #558b63; font-size: 1.05em;">정량·정성 복합 분석 플랫폼</p>', unsafe_allow_html=True)
+
+st.markdown("")
+
+with st.container(border=True):
+    st.markdown("### 시스템 사용 주의사항")
+    st.markdown("""
+본 분석은 공개 정보 기반의 정성적 검증 시스템으로, 투자 의사결정의 보조 자료로만 활용되어야 합니다.
+
+**주요 내용:**
+- **정량 분석**: 재무제표의 객관적 지표를 기반한 위험 점수
+- **경영진 설명**: 기업이 공시한 내용의 해석 및 재무 논리의 일관성 검증
+- **정성적 검증**: 주석 및 공시 정보에서 발견된 잠재적 위험 요소의 추적
+
+최종 투자 의사결정은 반드시 전문가의 자문을 거쳐야 합니다.
+    """)
+
+st.markdown("")
+
 with st.sidebar:
-    st.markdown("### ⚙️ 데이터 수집 설정")
+    st.markdown("### 분석 설정")
     st.markdown("---")
-    company_name = st.text_input("기업명 입력", value="하이브", key="company_input", placeholder="분석할 기업명을 입력하세요")
 
-    if st.button("🔍 데이터 수집 시작", key="fetch_data", use_container_width=True):
+    company_name = st.text_input("기업명 입력", value="하이브", key="company_input", placeholder="상장사 기업명을 입력하세요")
+
+    st.markdown("")
+    if st.button("데이터 분석 시작", key="fetch_data", use_container_width=True):
         st.session_state.fetch_triggered = True
 
     st.markdown("---")
-    st.caption("💡 **팁:** 상장사 기업명으로 검색하면 가장 최신의 공시 정보가 조회됩니다.")
+    st.markdown("#### API 키 관리")
+    st.info("API 키는 .env 파일에서 관리됩니다. 절대 이 파일을 커밋하지 마세요.")
 
-# 메인: 데이터 수집 및 분석
+    st.markdown("---")
+    st.markdown("#### 정보")
+    st.caption("DART API 기반 한국 상장회사 공시 정보 분석")
+
+# ============================================================================
+# UI - 분석 결과
+# ============================================================================
+
 if st.session_state.get("fetch_triggered", False):
-    # 1. 기업 검색
-    with st.spinner("기업 정보 조회 중..."):
+    with st.spinner("데이터 수집 중..."):
         corp_code, corp_name_result = search_company(dart, company_name)
 
         if not corp_code:
-            st.error(f"❌ '{company_name}'을(를) 찾을 수 없습니다.")
+            st.error(f"'{company_name}'을(를) 찾을 수 없습니다.")
             st.stop()
 
-        st.success(f"✅ 기업 발견: {corp_name_result} (코드: {corp_code})")
-
-    # 2. 정기 공시 조회
-    with st.spinner("정기 공시 조회 중..."):
+    with st.spinner("공시 정보 조회 중..."):
         report, report_type = get_periodic_report(dart, corp_code, corp_name_result)
 
         if report is None:
-            st.error("❌ 정기 공시를 찾을 수 없습니다.")
+            st.error("정기 공시를 찾을 수 없습니다.")
             st.stop()
 
         rcept_no = report['rcept_no']
         rcept_dt = report['rcept_dt']
 
-        st.success(f"✅ {report_type} 발견 (접수: {rcept_dt})")
-
-    # 3. 재무제표 추출
-    with st.spinner("재무제표 추출 중..."):
+    with st.spinner("재무 데이터 추출 중..."):
         financial_df = extract_financial_statement(dart, corp_code)
 
         if financial_df is None or financial_df.empty:
-            st.warning("⚠️ 재무제표 데이터를 찾을 수 없습니다.")
+            st.warning("재무제표 데이터를 찾을 수 없습니다.")
             financial_df = None
 
-    # 4. 주석 추출
-    with st.spinner("주석 텍스트 추출 중..."):
+    with st.spinner("주석 추출 중..."):
         notes = extract_notes(dart, rcept_no)
 
-        if notes:
-            st.success(f"✅ 주석 추출 완료 ({len(notes):,}자)")
-        else:
-            st.warning("⚠️ 주석을 추출하지 못했습니다.")
+        if not notes:
             notes = "(주석 없음)"
 
     st.markdown("---")
 
-    # ========================================================================
-    # 분석 결과 표시 - 탭 구조
-    # ========================================================================
-
     analysis = financial_rule_engine(financial_df)
 
-    with st.spinner("경영진 소명 생성 중..."):
+    with st.spinner("분석 진행 중..."):
         mgmt_response = management_explanations(corp_name_result, analysis, notes, llm)
-
-    with st.spinner("리스크 검증 분석 중..."):
         caveats = stakeholder_caveats(corp_name_result, mgmt_response, notes, analysis, llm)
 
     risk_categories = extract_risk_categories(caveats)
 
-    # 탭 생성
-    tab1, tab2, tab3 = st.tabs(["📊 정량 리스크 분석", "⚖️ 청문 공방 세션", "🔍 심층 주석 추적"])
+    tab1, tab2, tab3 = st.tabs(["정량 재무 분석", "정성적 크로스체킹", "주석 기반 리스크"])
 
     # ========================================================================
-    # Tab 1: 정량 리스크 분석
+    # Tab 1: 정량 재무 분석
     # ========================================================================
     with tab1:
-        st.markdown('<div class="section-header">📈 정량 규칙 엔진 기반의 회계 리스크 점수 산출</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">정량 규칙 엔진 기반 회계 리스크 점수</div>', unsafe_allow_html=True)
 
-        # 메트릭 카드 (4열)
+        with st.container(border=True):
+            st.markdown("**기업 기본 정보**")
+            info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+
+            with info_col1:
+                st.metric("기업명", corp_name_result)
+            with info_col2:
+                st.metric("기업코드", corp_code)
+            with info_col3:
+                st.metric("보고서", report_type)
+            with info_col4:
+                st.metric("공시일", rcept_dt)
+
+        st.markdown("")
+
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
             risk_score = analysis['financial_risk_score']
-            risk_emoji = "🔴" if risk_score >= 70 else "🟡" if risk_score >= 50 else "🟢"
             st.metric(
                 "종합 위험도",
                 f"{risk_score}/100",
@@ -790,14 +762,14 @@ if st.session_state.get("fetch_triggered", False):
             st.metric(
                 "매출 질 점수",
                 f"{analysis['component_scores']['revenue_quality']}/100",
-                help="매출채권 회전율, 영업현금흐름 등"
+                help="매출채권 회전율, 영업현금흐름"
             )
 
         with col3:
             st.metric(
                 "유동성 점수",
                 f"{analysis['component_scores']['liquidity_stress']}/100",
-                help="단기유동성 압박도 평가"
+                help="단기유동성 압박도"
             )
 
         with col4:
@@ -808,175 +780,133 @@ if st.session_state.get("fetch_triggered", False):
             )
 
         st.markdown("")
+        st.markdown("---")
 
-        # 상세 분석 결과 박스
+        st.markdown('<div class="section-header">분석 상세 결과</div>', unsafe_allow_html=True)
+
         with st.container(border=True):
-            st.markdown('<div class="section-header">📋 분석 상세 결과</div>', unsafe_allow_html=True)
-
             if analysis['detailed_findings']:
                 for key, value in analysis['detailed_findings'].items():
-                    st.markdown(f"• {value}")
+                    st.markdown(f"**{value}**")
             else:
-                st.markdown("*상세 분석 데이터 없음*")
+                st.markdown("상세 분석 데이터 없음")
 
         st.markdown("")
         st.markdown("---")
 
-        # 최종 요약
-        st.markdown('<div class="section-header">📌 기업 기본 정보 & 리스크 평가 종합</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">정량 리스크 평가 총평</div>', unsafe_allow_html=True)
 
-        summary_col1, summary_col2 = st.columns(2)
+        with st.container(border=True):
+            risk_score = analysis['financial_risk_score']
 
-        with summary_col1:
-            with st.container(border=True):
-                st.markdown("**📊 기업 기본 정보**")
-                st.markdown(f"""
-                • **기업명:** {corp_name_result}
-                • **기업 코드:** {corp_code}
-                • **보고서:** {report_type}
-                • **공시 접수일:** {rcept_dt}
-                """)
+            if risk_score >= 70:
+                assessment = "현재 정량 지표상 상당한 재무 리스크가 식별됩니다. 부채비율, 유동성, 현금흐름 등의 주요 지표에서 개선이 필요합니다. 추가적인 정성 분석을 통해 이러한 위험 요소가 기업의 구조적 문제인지, 또는 일시적 변동인지 파악해야 합니다."
+            elif risk_score >= 50:
+                assessment = "정량 지표상 중간 수준의 리스크가 식별됩니다. 특정 회계 지표에서 주의가 필요하며, 경영진의 대응 방안 및 개선 계획을 검토할 필요가 있습니다. 정성 분석을 통해 경영 안정성을 추가 확인하십시오."
+            else:
+                assessment = "정량 지표상 위험도는 정상 수준입니다. 다만, 주석 정보와의 종합 검토를 통해 잠재적 리스크가 있는지 추가 확인이 권장됩니다."
 
-        with summary_col2:
-            with st.container(border=True):
-                st.markdown("**📈 리스크 평가 종합**")
-                risk_color = "🔴" if analysis['financial_risk_score'] >= 70 else "🟡" if analysis['financial_risk_score'] >= 50 else "🟢"
-                st.markdown(f"""
-                • **종합 위험도:** {risk_color} **{analysis['financial_risk_score']}/100** ({analysis['risk_level']})
-                • **매출 질:** {analysis['component_scores']['revenue_quality']}/100
-                • **유동성:** {analysis['component_scores']['liquidity_stress']}/100
-                • **부채:** {analysis['component_scores']['leverage_risk']}/100
-                """)
+            st.markdown(assessment)
 
     # ========================================================================
-    # Tab 2: 청문 공방 세션 (경영진 vs 감시자)
+    # Tab 2: 정성적 크로스체킹
     # ========================================================================
     with tab2:
-        st.markdown('<div class="section-header">💼 ⚖️ 경영진의 입장 vs 감시자의 관점</div>', unsafe_allow_html=True)
-        st.markdown("**K-IFRS 기준의 재무 건전성 입증 vs 기업지배구조·잠재 리스크 검증**")
+        st.markdown('<div class="section-header">K-IFRS 기준 재무 건전성 검증</div>', unsafe_allow_html=True)
 
         col_left, col_right = st.columns(2)
 
         with col_left:
             with st.container(border=True):
-                st.markdown("### 👨‍💼 경영진 소명")
-                st.markdown("*Management Response*")
+                st.markdown("### 경영진 설명")
                 st.markdown(mgmt_response)
 
         with col_right:
             with st.container(border=True):
-                st.markdown("### ⚠️ 감시자의 리스크 지적")
-                st.markdown("*Stakeholder Caveats*")
+                st.markdown("### 정성적 검증")
                 st.markdown(caveats)
 
     # ========================================================================
-    # Tab 3: 심층 주석 추적 (리스크 아코디언)
+    # Tab 3: 주석 기반 리스크
     # ========================================================================
     with tab3:
-        st.markdown('<div class="section-header">🔍 주석 기반 리스크 세부 항목 분석</div>', unsafe_allow_html=True)
-        st.markdown("**재무제표 주석에서 도출된 잠재 리스크 요소의 상세 검토**")
+        st.markdown('<div class="section-header">주석 기반 리스크 세부 분석</div>', unsafe_allow_html=True)
 
-        st.markdown("")
-
-        # 우발채무 아코디언
-        with st.expander("🚨 우발채무 및 계류 중인 소송", expanded=False):
+        with st.expander("우발채무 및 계류 중인 소송", expanded=False):
             if risk_categories["contingent_liabilities"]:
                 for item in risk_categories["contingent_liabilities"]:
-                    st.markdown(f"• {item}")
+                    st.markdown(f"- {item}")
             else:
                 st.markdown("""
-                본 분석에서 보고서 주석 섹션을 검토하여 다음을 추적합니다:
-                - 진행 중인 소송 및 분쟁 사건
-                - 미결제 우발채무 규모 및 시기
-                - 법적 리스크의 불확실성
+본 분석에서 추적하는 항목:
+- 진행 중인 소송 및 분쟁 사건
+- 미결제 우발채무 규모 및 해결 시점
+- 법적 리스크의 불확실성
                 """)
 
-        # 특수관계자 거래 아코디언
-        with st.expander("🤝 특수관계자 간 거래 및 자금 이동", expanded=False):
+        with st.expander("특수관계자 거래 및 자금 이동", expanded=False):
             if risk_categories["related_party_transactions"]:
                 for item in risk_categories["related_party_transactions"]:
-                    st.markdown(f"• {item}")
+                    st.markdown(f"- {item}")
             else:
                 st.markdown("""
-                본 분석에서 주석에서 추적하는 사항:
-                - 지배주주·경영진·계열사 간 자금 이동
-                - 부당한 거래 가격 책정의 가능성
-                - 담보·보증 약정의 투명성
+본 분석에서 추적하는 항목:
+- 지배주주·경영진·계열사 간 자금 이동
+- 부당한 거래 가격 책정의 가능성
+- 담보·보증 약정의 투명성
                 """)
 
-        # 자산손상차손 아코디언
-        with st.expander("📉 종속·관계기업 자산손상 및 투자 손실", expanded=False):
+        with st.expander("자산손상차손 및 투자 손실", expanded=False):
             if risk_categories["asset_impairment"]:
                 for item in risk_categories["asset_impairment"]:
-                    st.markdown(f"• {item}")
+                    st.markdown(f"- {item}")
             else:
                 st.markdown("""
-                본 분석에서 검토하는 사항:
-                - M&A 및 인수 자산의 부진 현황
-                - 무형자산 및 투자 손상 규모
-                - 손상 인식의 적절성 평가
+본 분석에서 추적하는 항목:
+- M&A 및 인수 자산의 부진 현황
+- 무형자산 및 투자 손상 규모
+- 손상 인식의 적절성 평가
                 """)
 
-        # 투자 권고 아코디언
-        with st.expander("💼 투자 권고 및 최종 결론", expanded=True):
+        st.markdown("")
+        st.markdown("---")
+
+        st.markdown('<div class="conclusion-box">최종 평가 및 권고</div>', unsafe_allow_html=True)
+
+        with st.container(border=True):
             if risk_categories["investment_assessment"]:
                 st.markdown(risk_categories["investment_assessment"])
             else:
-                st.markdown(caveats[-500:])
-
-        st.markdown("---")
-
-        with st.container(border=True):
-            st.markdown("""
-            ### 💡 시스템 사용 주의사항
-
-            본 분석은 공개 정보 기반의 **정성적 검증 시스템**으로, 투자 의사결정의 **보조 자료**로만 활용되어야 합니다.
-
-            - **정량 분석:** 재무제표의 객관적 지표를 기반한 위험 점수
-            - **경영진 소명:** 기업이 공시한 내용의 해석 및 재무 논리의 일관성 검증
-            - **리스크 지적:** 주석 및 공시 정보에서 발견된 잠재적 위험 요소의 추적
-
-            **최종 투자 의사결정은 반드시 전문가의 자문을 거쳐야 합니다.**
-            """)
+                st.markdown("최종 평가를 도출하기 위해 상기 정량 분석과 정성 검증을 종합하여 투자 여부를 판단하십시오.")
 
 else:
-    # 초기 화면
+    st.markdown("")
+    st.markdown('<h2 style="text-align: center; color: #1b4332;">데이터 분석 준비 완료</h2>', unsafe_allow_html=True)
+    st.markdown("")
+
     with st.container(border=True):
         st.markdown("""
-        ### 📊 시스템에 오신 것을 환영합니다
+### 분석 프로세스
 
-        좌측 사이드바에서 기업명을 입력하고 **'데이터 수집 시작'** 버튼을 클릭하세요.
+본 시스템은 다음 3단계를 통해 종합 분석을 제공합니다:
+
+**1단계: 정량 재무 분석**
+- 회계 규칙 엔진 기반의 객관적 위험 점수 산출
+- 매출 질, 유동성, 부채 수준에 대한 정량적 평가
+- 매출채권 회전율, 유동비율, 부채비율 등 핵심 지표 분석
+
+**2단계: 정성적 크로스체킹**
+- K-IFRS 기준에 따른 재무 상황 검증
+- 전략적 자산 취득 및 투자 정당성 평가
+- 기업지배구조 및 잠재 리스크 검증
+
+**3단계: 주석 기반 리스크 분석**
+- 우발채무 및 계류 중인 소송 추적
+- 특수관계자 거래 및 자금 이동 검증
+- 자산손상차손 및 투자 손실 현황 분석
+
+### 데이터 출처
+- DART: 한국 상장회사 공시 정보
+- Claude LLM: 정성적 분석 및 검증
+- Financial Rule Engine: 전문가 수준 재무 지표 분석
         """)
-
-    st.markdown("---")
-
-    st.subheader("🎯 시스템 개요")
-    st.markdown("""
-    본 시스템은 **정량 분석 → 경영진 소명 → 이해관계자 검증**의 3단계 프로세스를 통해
-    기업의 재무 투명성과 잠재 리스크를 종합적으로 분석합니다.
-
-    ### 📊 분석 단계 상세 설명
-
-    **1️⃣ 정량 재무 분석 (Quantitative Analysis)**
-    - 회계 규칙 엔진 기반의 객관적 위험 점수 산출
-    - 매출 질, 유동성, 부채 수준에 대한 정량적 평가
-    - 매출채권 회전율, 유동비율, 부채비율 등 핵심 지표 분석
-
-    **2️⃣ 경영진 소명 (Management Explanations)**
-    - K-IFRS 기준에 따른 재무 상황 설명
-    - 전략적 자산 취득 및 투자 정당화
-    - 기업의 재무 보고의 논리와 일관성 검증
-
-    **3️⃣ 이해관계자 검증 (Auditor & Stakeholder Caveats)**
-    - 🚨 **우발채무 및 계류 중인 소송:** 미결제 법적 리스크 추적
-    - 🤝 **특수관계자 거래:** 부당 거래 및 자금 이동 검증
-    - 📉 **자산손상차손:** M&A 및 투자 손실 현황 분석
-
-    ### 🔐 데이터 출처
-    - **DART (Data Analysis, Retrieval and Transfer):** 한국 상장회사의 공시 정보
-    - **Claude LLM:** 정성적 분석 및 리스크 검증
-    - **Financial Rule Engine:** 전문가 수준의 재무 지표 분석
-    """)
-
-    st.markdown("---")
-    st.caption("© 2026 이해관계자 관점 기업 리스크 탐지 시스템 | 학회 발표용 전문 분석 플랫폼")
