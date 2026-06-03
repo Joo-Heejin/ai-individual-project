@@ -161,6 +161,9 @@ st.markdown("""
     [data-testid="stExpander"] summary {
         font-weight: 600 !important;
         font-size: 1.05em !important;
+        line-height: 1.8 !important;
+        padding: 12px 0 !important;
+        word-break: break-word !important;
     }
 
     [data-testid="stExpander"] p {
@@ -187,7 +190,7 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
         padding: 10px 20px;
-        font-size: 1.05em;
+        font-size: 1.5em !important;
     }
 
     .stButton > button:hover {
@@ -322,8 +325,9 @@ st.markdown("""
 
     [data-testid="stButton"] button {
         height: 70px !important;
-        line-height: 1.2 !important;
-        padding: 12px 24px !important;
+        line-height: 1.4 !important;
+        padding: 18px 24px !important;
+        box-sizing: border-box !important;
     }
 
     .disclaimer {
