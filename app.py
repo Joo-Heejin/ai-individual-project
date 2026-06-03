@@ -166,7 +166,8 @@ st.markdown("""
         color: black !important;
         border: 1px solid #d0d0d0 !important;
         font-size: 1.2em !important;
-        padding: 12px 16px !important;
+        padding: 20px 16px !important;
+        height: 60px !important;
     }
 
     .stTextInput > div > div > input::placeholder {
@@ -268,8 +269,10 @@ st.markdown("""
         color: #558b63;
         text-align: center;
         margin: 0;
-        max-width: 600px;
+        max-width: 1000px;
         font-weight: 500;
+        white-space: normal;
+        word-wrap: break-word;
     }
 
     .input-container {
@@ -284,8 +287,8 @@ st.markdown("""
     }
 
     [data-testid="stButton"] button {
-        height: 52px !important;
-        font-size: 1.1em !important;
+        height: 60px !important;
+        font-size: 1.15em !important;
     }
 
     .disclaimer {
@@ -724,22 +727,9 @@ def extract_risk_categories(caveats_text: str) -> dict:
 # ============================================================================
 
 with st.sidebar:
-    if "sidebar_expanded" not in st.session_state:
-        st.session_state.sidebar_expanded = True
-
-    toggle_text = ">> 설정 닫기" if st.session_state.sidebar_expanded else "<< 설정 열기"
-
-    if st.button(toggle_text, key="sidebar_toggle", use_container_width=True):
-        st.session_state.sidebar_expanded = not st.session_state.sidebar_expanded
-        st.rerun()
-
-    st.markdown("---")
-
-    if st.session_state.sidebar_expanded:
-        st.markdown("### 분석 설정")
-        st.markdown("")
-        st.markdown("**DART API 키 연동**")
-        st.caption(".env 파일에서 관리")
+    st.markdown("### 분석 설정")
+    st.markdown("")
+    st.markdown("**DART API 키 연동**")
 
 # ============================================================================
 # UI - 초기 화면 vs 분석 결과
@@ -760,9 +750,9 @@ if not st.session_state.get("fetch_triggered", False):
             <h1>기업 리스크 검증</h1>
             <p>재무제표 정량 분석과 주석 정성 검증으로 기업의 투명성과 잠재 리스크를 종합 평가합니다.</p>
         </div>
-        """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True, unsafe_allow_html=True)
 
-        col_input, col_btn = st.columns([0.65, 0.35], gap="small")
+        col_input, col_btn = st.columns([0.7, 0.3], gap="small")
 
         with col_input:
             company_name = st.text_input(
