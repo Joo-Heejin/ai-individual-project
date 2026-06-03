@@ -40,6 +40,16 @@ st.markdown("""
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     }
 
+    input {
+        font-size: 1.5em !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    button {
+        font-size: 1.5em !important;
+        font-weight: 600 !important;
+    }
+
     body {
         background: linear-gradient(135deg, #f0f7f2 0%, #e8f5e9 100%);
         color: #1b3a2a;
@@ -188,15 +198,10 @@ st.markdown("""
         background-color: white !important;
         color: black !important;
         border: 1px solid #d0d0d0 !important;
-        font-size: 1.3em !important;
         padding: 18px 16px !important;
         height: 70px !important;
         box-sizing: border-box !important;
         line-height: 1.4 !important;
-    }
-
-    input {
-        font-size: 1.3em !important;
     }
 
     .stTextInput > div > div > input::placeholder {
@@ -317,13 +322,8 @@ st.markdown("""
 
     [data-testid="stButton"] button {
         height: 70px !important;
-        font-size: 1.4em !important;
         line-height: 1.2 !important;
         padding: 12px 24px !important;
-    }
-
-    button {
-        font-size: 1.4em !important;
     }
 
     .disclaimer {
