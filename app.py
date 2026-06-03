@@ -188,10 +188,15 @@ st.markdown("""
         background-color: white !important;
         color: black !important;
         border: 1px solid #d0d0d0 !important;
-        font-size: 1.35em !important;
-        padding: 16px 16px !important;
+        font-size: 1.3em !important;
+        padding: 18px 16px !important;
         height: 70px !important;
         box-sizing: border-box !important;
+        line-height: 1.4 !important;
+    }
+
+    input {
+        font-size: 1.3em !important;
     }
 
     .stTextInput > div > div > input::placeholder {
@@ -312,7 +317,13 @@ st.markdown("""
 
     [data-testid="stButton"] button {
         height: 70px !important;
-        font-size: 1.3em !important;
+        font-size: 1.4em !important;
+        line-height: 1.2 !important;
+        padding: 12px 24px !important;
+    }
+
+    button {
+        font-size: 1.4em !important;
     }
 
     .disclaimer {
