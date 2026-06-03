@@ -145,6 +145,29 @@ st.markdown("""
         border: 1px solid #a5d6a7 !important;
         border-radius: 12px !important;
         background: rgba(232, 245, 233, 0.3) !important;
+        padding: 16px !important;
+    }
+
+    [data-testid="stExpander"] summary {
+        font-weight: 600 !important;
+        font-size: 1.05em !important;
+    }
+
+    [data-testid="stExpander"] p {
+        margin: 12px 0 !important;
+        line-height: 1.8 !important;
+        font-size: 1.01em !important;
+    }
+
+    [data-testid="stExpander"] ul {
+        margin: 12px 0 !important;
+        padding-left: 24px !important;
+    }
+
+    [data-testid="stExpander"] li {
+        margin: 8px 0 !important;
+        line-height: 1.8 !important;
+        font-size: 1.01em !important;
     }
 
     .stButton > button {
