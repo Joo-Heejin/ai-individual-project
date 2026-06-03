@@ -165,10 +165,18 @@ st.markdown("""
         background-color: white !important;
         color: black !important;
         border: 1px solid #d0d0d0 !important;
+        font-size: 1.2em !important;
+        padding: 12px 16px !important;
     }
 
     .stTextInput > div > div > input::placeholder {
-        color: #a0a0a0 !important;
+        color: transparent !important;
+    }
+
+    .stTextInput label {
+        font-size: 1.15em !important;
+        color: #1b4332 !important;
+        margin-bottom: 8px !important;
     }
 
     .stSuccess {
@@ -226,12 +234,12 @@ st.markdown("""
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 600px;
-        height: 600px;
-        background: radial-gradient(circle, rgba(45, 106, 79, 0.05) 0%, transparent 70%);
+        width: 700px;
+        height: 700px;
+        background: radial-gradient(circle, rgba(45, 106, 79, 0.08) 0%, rgba(45, 106, 79, 0.04) 50%, transparent 75%);
         border-radius: 50%;
-        filter: blur(80px);
-        z-index: -1;
+        filter: blur(100px);
+        z-index: 0;
         pointer-events: none;
     }
 
@@ -241,37 +249,51 @@ st.markdown("""
         align-items: center;
         justify-content: center;
         min-height: 60vh;
-        gap: 30px;
+        gap: 40px;
+        position: relative;
+        z-index: 1;
     }
 
     .input-section h1 {
-        font-size: 2.2em;
+        font-size: 3.5em;
         font-weight: 700;
         color: #1b4332;
         margin: 0;
         text-align: center;
+        letter-spacing: -1px;
     }
 
     .input-section p {
-        font-size: 1.05em;
+        font-size: 1.35em;
         color: #558b63;
         text-align: center;
         margin: 0;
-        max-width: 500px;
+        max-width: 600px;
+        font-weight: 500;
     }
 
     .input-container {
         display: flex;
         gap: 12px;
         width: 100%;
-        max-width: 500px;
+        max-width: 600px;
+    }
+
+    [data-testid="stTextInput"] {
+        flex: 1;
+    }
+
+    [data-testid="stButton"] button {
+        height: 52px !important;
+        font-size: 1.1em !important;
     }
 
     .disclaimer {
-        font-size: 0.9em;
-        color: #b0b0b0;
+        font-size: 0.95em;
+        color: #a8a8a8;
         text-align: center;
-        margin-top: 20px;
+        margin-top: 30px;
+        line-height: 1.5;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -702,10 +724,22 @@ def extract_risk_categories(caveats_text: str) -> dict:
 # ============================================================================
 
 with st.sidebar:
-    st.markdown("### 분석 설정")
+    if "sidebar_expanded" not in st.session_state:
+        st.session_state.sidebar_expanded = True
+
+    toggle_text = ">> 설정 닫기" if st.session_state.sidebar_expanded else "<< 설정 열기"
+
+    if st.button(toggle_text, key="sidebar_toggle", use_container_width=True):
+        st.session_state.sidebar_expanded = not st.session_state.sidebar_expanded
+        st.rerun()
+
     st.markdown("---")
-    st.markdown("**DART API 키 연동**")
-    st.caption(".env 파일에서 관리")
+
+    if st.session_state.sidebar_expanded:
+        st.markdown("### 분석 설정")
+        st.markdown("")
+        st.markdown("**DART API 키 연동**")
+        st.caption(".env 파일에서 관리")
 
 # ============================================================================
 # UI - 초기 화면 vs 분석 결과
@@ -724,26 +758,29 @@ if not st.session_state.get("fetch_triggered", False):
         st.markdown("""
         <div class="input-section">
             <h1>기업 리스크 검증</h1>
-            <p>정량·정성 복합 분석 플랫폼</p>
+            <p>재무제표 정량 분석과 주석 정성 검증으로 기업의 투명성과 잠재 리스크를 종합 평가합니다.</p>
         </div>
         """, unsafe_allow_html=True)
 
-        col_input, col_btn = st.columns([3, 1])
+        col_input, col_btn = st.columns([0.65, 0.35], gap="small")
 
         with col_input:
             company_name = st.text_input(
                 "기업명",
-                value="하이브",
+                value="",
                 key="company_input",
-                placeholder="기업명을 입력하세요",
+                placeholder="",
                 label_visibility="collapsed"
             )
 
         with col_btn:
             if st.button("분석", key="fetch_data", use_container_width=True):
-                st.session_state.company_name = company_name
-                st.session_state.fetch_triggered = True
-                st.rerun()
+                if company_name.strip():
+                    st.session_state.company_name = company_name
+                    st.session_state.fetch_triggered = True
+                    st.rerun()
+                else:
+                    st.error("기업명을 입력하세요")
 
         st.markdown('<p class="disclaimer">본 분석은 공개 정보 기반의 정량 및 정성적 검증 시스템으로, 투자 의사결정의 보조 자료로만 활용하는 것을 권장드립니다.</p>', unsafe_allow_html=True)
 
