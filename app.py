@@ -72,9 +72,9 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] {
-        background: rgba(232, 245, 233, 0.7) !important;
-        backdrop-filter: blur(16px);
-        border-right: 1px solid #c8e6c9;
+        background: white !important;
+        backdrop-filter: none !important;
+        border-right: 1px solid #e0e0e0;
     }
 
     .stTabs [data-baseweb="tab-list"] {
@@ -161,6 +161,16 @@ st.markdown("""
         background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
     }
 
+    .stTextInput > div > div > input {
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #d0d0d0 !important;
+    }
+
+    .stTextInput > div > div > input::placeholder {
+        color: #a0a0a0 !important;
+    }
+
     .stSuccess {
         display: none;
     }
@@ -210,12 +220,66 @@ st.markdown("""
         margin-top: 15px;
         margin-bottom: 8px;
     }
+
+    .hero-gradient {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(45, 106, 79, 0.05) 0%, transparent 70%);
+        border-radius: 50%;
+        filter: blur(80px);
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    .input-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        gap: 30px;
+    }
+
+    .input-section h1 {
+        font-size: 2.2em;
+        font-weight: 700;
+        color: #1b4332;
+        margin: 0;
+        text-align: center;
+    }
+
+    .input-section p {
+        font-size: 1.05em;
+        color: #558b63;
+        text-align: center;
+        margin: 0;
+        max-width: 500px;
+    }
+
+    .input-container {
+        display: flex;
+        gap: 12px;
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .disclaimer {
+        font-size: 0.9em;
+        color: #b0b0b0;
+        text-align: center;
+        margin-top: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 st.html("""
 <div class="deco-blob-1"></div>
 <div class="deco-blob-2"></div>
+<div class="hero-gradient"></div>
 """)
 
 # ============================================================================
@@ -634,55 +698,62 @@ def extract_risk_categories(caveats_text: str) -> dict:
     return categories
 
 # ============================================================================
-# UI - 초기 화면
+# UI - 사이드바 공통
 # ============================================================================
-
-col1, col2, col3 = st.columns([1, 2, 1])
-
-with col2:
-    st.markdown('<h1 style="text-align: center; color: #1b4332; font-size: 2em; margin-bottom: 10px;">기업 리스크 검증 시스템</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #558b63; font-size: 1.05em;">정량·정성 복합 분석 플랫폼</p>', unsafe_allow_html=True)
-
-st.markdown("")
-
-with st.container(border=True):
-    st.markdown("### 시스템 사용 주의사항")
-    st.markdown("""
-본 분석은 공개 정보 기반의 정성적 검증 시스템으로, 투자 의사결정의 보조 자료로만 활용되어야 합니다.
-
-**주요 내용:**
-- **정량 분석**: 재무제표의 객관적 지표를 기반한 위험 점수
-- **경영진 설명**: 기업이 공시한 내용의 해석 및 재무 논리의 일관성 검증
-- **정성적 검증**: 주석 및 공시 정보에서 발견된 잠재적 위험 요소의 추적
-
-최종 투자 의사결정은 반드시 전문가의 자문을 거쳐야 합니다.
-    """)
-
-st.markdown("")
 
 with st.sidebar:
     st.markdown("### 분석 설정")
     st.markdown("---")
+    st.markdown("**DART API 키 연동**")
+    st.caption(".env 파일에서 관리")
 
-    company_name = st.text_input("기업명 입력", value="하이브", key="company_input", placeholder="상장사 기업명을 입력하세요")
+# ============================================================================
+# UI - 초기 화면 vs 분석 결과
+# ============================================================================
 
-    st.markdown("")
-    if st.button("데이터 분석 시작", key="fetch_data", use_container_width=True):
-        st.session_state.fetch_triggered = True
+# ============================================================================
+# UI - 초기 화면 로직
+# ============================================================================
 
-    st.markdown("---")
-    st.markdown("#### API 키 관리")
-    st.info("API 키는 .env 파일에서 관리됩니다. 절대 이 파일을 커밋하지 마세요.")
+if not st.session_state.get("fetch_triggered", False):
+    st.html('<div class="hero-gradient"></div>')
 
-    st.markdown("---")
-    st.markdown("#### 정보")
-    st.caption("DART API 기반 한국 상장회사 공시 정보 분석")
+    col_center = st.columns([1])[0]
+
+    with col_center:
+        st.markdown("""
+        <div class="input-section">
+            <h1>기업 리스크 검증</h1>
+            <p>정량·정성 복합 분석 플랫폼</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_input, col_btn = st.columns([3, 1])
+
+        with col_input:
+            company_name = st.text_input(
+                "기업명",
+                value="하이브",
+                key="company_input",
+                placeholder="기업명을 입력하세요",
+                label_visibility="collapsed"
+            )
+
+        with col_btn:
+            if st.button("분석", key="fetch_data", use_container_width=True):
+                st.session_state.company_name = company_name
+                st.session_state.fetch_triggered = True
+                st.rerun()
+
+        st.markdown('<p class="disclaimer">본 분석은 공개 정보 기반의 정량 및 정성적 검증 시스템으로, 투자 의사결정의 보조 자료로만 활용하는 것을 권장드립니다.</p>', unsafe_allow_html=True)
 
 # ============================================================================
 # UI - 분석 결과
 # ============================================================================
 
-if st.session_state.get("fetch_triggered", False):
+elif st.session_state.get("fetch_triggered", False):
+    company_name = st.session_state.get("company_name", "")
+
     with st.spinner("데이터 수집 중..."):
         corp_code, corp_name_result = search_company(dart, company_name)
 
@@ -878,35 +949,3 @@ if st.session_state.get("fetch_triggered", False):
                 st.markdown(risk_categories["investment_assessment"])
             else:
                 st.markdown("최종 평가를 도출하기 위해 상기 정량 분석과 정성 검증을 종합하여 투자 여부를 판단하십시오.")
-
-else:
-    st.markdown("")
-    st.markdown('<h2 style="text-align: center; color: #1b4332;">데이터 분석 준비 완료</h2>', unsafe_allow_html=True)
-    st.markdown("")
-
-    with st.container(border=True):
-        st.markdown("""
-### 분석 프로세스
-
-본 시스템은 다음 3단계를 통해 종합 분석을 제공합니다:
-
-**1단계: 정량 재무 분석**
-- 회계 규칙 엔진 기반의 객관적 위험 점수 산출
-- 매출 질, 유동성, 부채 수준에 대한 정량적 평가
-- 매출채권 회전율, 유동비율, 부채비율 등 핵심 지표 분석
-
-**2단계: 정성적 크로스체킹**
-- K-IFRS 기준에 따른 재무 상황 검증
-- 전략적 자산 취득 및 투자 정당성 평가
-- 기업지배구조 및 잠재 리스크 검증
-
-**3단계: 주석 기반 리스크 분석**
-- 우발채무 및 계류 중인 소송 추적
-- 특수관계자 거래 및 자금 이동 검증
-- 자산손상차손 및 투자 손실 현황 분석
-
-### 데이터 출처
-- DART: 한국 상장회사 공시 정보
-- Claude LLM: 정성적 분석 및 검증
-- Financial Rule Engine: 전문가 수준 재무 지표 분석
-        """)
