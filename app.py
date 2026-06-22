@@ -29,11 +29,15 @@ st.set_page_config(
     page_title="Enterprise Risk Detection System",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 st.markdown("""
 <style>
+    /* 사이드바 토글 버튼 완전 제거 */
+    button[aria-label="Collapse sidebar"] {
+        display: none !important;
+    }
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
 
     * {
@@ -318,6 +322,8 @@ st.markdown("""
         width: 100%;
         max-width: 600px;
     }
+
+    /* 사이드바 관련 CSS 제거 - expanded 상태 유지 */
 
     [data-testid="stTextInput"] {
         flex: 1;
@@ -687,74 +693,49 @@ def extract_risk_categories(caveats_text: str) -> dict:
         "investment_assessment": ""
     }
 
-    contingent_patterns = [
-        r'[①1][\.\s]*우발채무.*?(?=[②2]|③3|【|$)',
-        r'우발채무.*?(?=특수관계자|자산손상|【|$)',
-    ]
-    contingent_text = ""
-    for pattern in contingent_patterns:
-        match = re.search(pattern, caveats_text, re.DOTALL | re.IGNORECASE)
-        if match:
-            contingent_text = match.group(0)
-            break
+    if not caveats_text or len(caveats_text) < 50:
+        return categories
 
-    if contingent_text:
-        lines = contingent_text.split('\n')
-        for line in lines:
-            if any(kw in line for kw in ['소송', '건', '억', '만', '우발', '주석', '분쟁', '법적']):
-                cleaned = line.strip().replace('- ', '').replace('• ', '').strip()
-                if cleaned and len(cleaned) > 5:
-                    categories["contingent_liabilities"].append(cleaned)
+    contingent_keywords = ['소송', '분쟁', '우발', '법적', '청구', '피소', '소장']
+    related_keywords = ['거래', '자금', '대여', '보증', '담보', '지배', '계열사', '관계기업']
+    impair_keywords = ['손상', '인수', 'M&A', '투자', '무형자산', '부진', '손실']
 
-    related_patterns = [
-        r'[②2][\.\s]*특수관계자.*?(?=[③3]|【|$)',
-        r'특수관계자.*?(?=자산손상|【|$)',
-    ]
-    related_text = ""
-    for pattern in related_patterns:
-        match = re.search(pattern, caveats_text, re.DOTALL | re.IGNORECASE)
-        if match:
-            related_text = match.group(0)
-            break
+    lines = caveats_text.split('\n')
 
-    if related_text:
-        lines = related_text.split('\n')
-        for line in lines:
-            if any(kw in line for kw in ['거래', '자금', '대여', '보증', '담보', '지배', '계열사', '관계기업']):
-                cleaned = line.strip().replace('- ', '').replace('• ', '').strip()
-                if cleaned and len(cleaned) > 5:
-                    categories["related_party_transactions"].append(cleaned)
+    current_section = None
+    for line in lines:
+        line_clean = line.strip()
 
-    impair_patterns = [
-        r'[③3][\.\s]*자산손상.*?(?=【|$)',
-        r'종속.*?기업.*?(?=【|$)',
-        r'자산손상.*?(?=【|투자.*?권고|$)',
-    ]
-    impair_text = ""
-    for pattern in impair_patterns:
-        match = re.search(pattern, caveats_text, re.DOTALL | re.IGNORECASE)
-        if match:
-            impair_text = match.group(0)
-            break
+        if not line_clean or len(line_clean) < 5:
+            continue
 
-    if impair_text:
-        lines = impair_text.split('\n')
-        for line in lines:
-            if any(kw in line for kw in ['손상', '인수', 'M&A', '투자', '무형자산', '영업부진', '손실']):
-                cleaned = line.strip().replace('- ', '').replace('• ', '').strip()
-                if cleaned and len(cleaned) > 5:
-                    categories["asset_impairment"].append(cleaned)
+        if any(kw in line_clean for kw in ['우발', '소송', '분쟁']):
+            current_section = "contingent_liabilities"
+        elif any(kw in line_clean for kw in ['특수', '관계자', '계열사']):
+            current_section = "related_party_transactions"
+        elif any(kw in line_clean for kw in ['손상', '투자손실', 'M&A']):
+            current_section = "asset_impairment"
+        elif any(kw in line_clean for kw in ['최종', '권고', '평가']):
+            current_section = None
 
-    final_patterns = [
-        r'【최종[\s\S]*?(?:강력|조건부|주의|권고)[\s\S]{0,200}',
-        r'투자.*?권고[\s\S]{0,300}',
-        r'【최종\s*결론】[\s\S]{0,500}',
-    ]
-    for pattern in final_patterns:
-        match = re.search(pattern, caveats_text, re.IGNORECASE)
-        if match:
-            categories["investment_assessment"] = match.group(0)
-            break
+        if current_section:
+            is_content_line = (
+                (current_section == "contingent_liabilities" and any(kw in line_clean for kw in contingent_keywords)) or
+                (current_section == "related_party_transactions" and any(kw in line_clean for kw in related_keywords)) or
+                (current_section == "asset_impairment" and any(kw in line_clean for kw in impair_keywords))
+            )
+
+            if is_content_line and len(line_clean) > 5:
+                cleaned = line_clean.replace('- ', '').replace('• ', '').replace('*', '').strip()
+                if cleaned and not cleaned.startswith('['):
+                    categories[current_section].append(cleaned)
+
+    if '최종' in caveats_text or '권고' in caveats_text:
+        lines_for_final = caveats_text.split('\n')
+        for i, line in enumerate(lines_for_final):
+            if any(kw in line for kw in ['최종', '권고', '투자']):
+                categories["investment_assessment"] = '\n'.join(lines_for_final[i:i+5])[:500]
+                break
 
     for key in ["contingent_liabilities", "related_party_transactions", "asset_impairment"]:
         categories[key] = list(dict.fromkeys(categories[key]))[:5]
@@ -762,13 +743,441 @@ def extract_risk_categories(caveats_text: str) -> dict:
     return categories
 
 # ============================================================================
-# UI - 사이드바 공통
+# 정성 위험도 점수 추출
 # ============================================================================
 
-with st.sidebar:
-    st.markdown("### 분석 설정")
-    st.markdown("")
-    st.markdown("**DART API 키 연동**")
+def extract_qualitative_risk_score(risk_categories: dict) -> dict:
+    """
+    Node 3의 stakeholder_caveats() 결과에서 정성 위험도 점수를 계산합니다.
+
+    계산 기준:
+    - 발견된 리스크 카테고리 개수 × 25점 (최대 100점)
+    - 4개 카테고리 가능: contingent_liabilities, related_party_transactions,
+                       asset_impairment, investment_assessment
+
+    Args:
+        risk_categories: {
+            "contingent_liabilities": [...],      # 발견된 우발채무 리스트
+            "related_party_transactions": [...],  # 발견된 특수관계자거래 리스트
+            "asset_impairment": [...],            # 발견된 자산손상 리스트
+            "investment_assessment": ""           # 최종 평가 텍스트
+        }
+
+    Returns:
+        {
+            "qualitative_risk_score": int (0-100),     # 정성 위험도 점수
+            "risk_count": int,                         # 발견된 리스크 카테고리 개수
+            "risk_breakdown": {                        # 카테고리별 발견 항목 개수
+                "contingent_liabilities": int,
+                "related_party_transactions": int,
+                "asset_impairment": int,
+                "investment_assessment": int (0 or 1)
+            }
+        }
+    """
+
+    risk_breakdown = {}
+    categories_with_risk = 0
+
+    # 3개 주요 카테고리 검사 (리스트 기반)
+    for category_key in ["contingent_liabilities", "related_party_transactions", "asset_impairment"]:
+        items = risk_categories.get(category_key, [])
+        item_count = len(items) if items else 0
+        risk_breakdown[category_key] = item_count
+
+        if item_count > 0:
+            categories_with_risk += 1
+
+    # 투자 평가 카테고리 검사 (텍스트 기반)
+    assessment = risk_categories.get("investment_assessment", "")
+    has_assessment = 1 if (assessment and len(assessment.strip()) > 0) else 0
+    risk_breakdown["investment_assessment"] = has_assessment
+
+    if has_assessment > 0:
+        categories_with_risk += 1
+
+    # 정성 위험도 점수: 카테고리 개수 × 25점 (최대 100점)
+    qualitative_risk_score = min(categories_with_risk * 25, 100)
+
+    return {
+        "qualitative_risk_score": qualitative_risk_score,
+        "risk_count": categories_with_risk,
+        "risk_breakdown": risk_breakdown
+    }
+
+# ============================================================================
+# Node 4: 가중치 통합 최종 위험 등급
+# ============================================================================
+
+def integrate_final_risk_grade(financial_risk_score: float, qualitative_risk_score: float) -> dict:
+    """
+    정량 위험도(Node 1)와 정성 위험도를 가중치로 통합하여 최종 위험 등급을 산출합니다.
+
+    가중치:
+    - 정량(Node 1): 60%
+    - 정성: 40%
+
+    최종 점수 = (financial_risk_score × 0.6) + (qualitative_risk_score × 0.4)
+
+    Args:
+        financial_risk_score: 정량 위험도 점수 (0-100) from Node 1
+        qualitative_risk_score: 정성 위험도 점수 (0-100) from extract_qualitative_risk_score()
+
+    Returns:
+        {
+            "final_integrated_score": float,           # 최종 통합 점수 (0-100)
+            "final_risk_grade": str,                   # "HIGH_RISK" | "MEDIUM_RISK" | "LOW_RISK"
+            "color": str,                              # "red" | "orange" | "green"
+            "explanation": str                         # 최종 판정 근거
+        }
+
+    판정 기준:
+    - final_score > 70: HIGH_RISK (red) → "고위험"
+    - 50 < final_score <= 70: MEDIUM_RISK (orange) → "중위험"
+    - final_score <= 50: LOW_RISK (green) → "저위험"
+    """
+
+    # 최종 통합 점수 계산
+    final_integrated_score = (financial_risk_score * 0.6) + (qualitative_risk_score * 0.4)
+
+    # 최종 등급 및 색상 결정
+    if final_integrated_score > 70:
+        final_risk_grade = "HIGH_RISK"
+        color = "red"
+        grade_label = "고위험"
+    elif final_integrated_score > 50:
+        final_risk_grade = "MEDIUM_RISK"
+        color = "orange"
+        grade_label = "중위험"
+    else:
+        final_risk_grade = "LOW_RISK"
+        color = "green"
+        grade_label = "저위험"
+
+    # 설명 생성
+    explanation = (
+        f"정량 위험도: {financial_risk_score:.1f}/100, "
+        f"정성 위험도: {qualitative_risk_score:.1f}/100을 "
+        f"종합(정량 60% + 정성 40%)하여 최종 등급 【{grade_label}】으로 판정됩니다."
+    )
+
+    return {
+        "final_integrated_score": round(final_integrated_score, 1),
+        "final_risk_grade": final_risk_grade,
+        "color": color,
+        "explanation": explanation
+    }
+
+# ============================================================================
+# Tab 4: 리스크 시나리오 분석 (스트레스 테스트)
+# ============================================================================
+
+def scenario_stress_test(financial_data: dict, scenario: str) -> dict:
+    """
+    과거 위기 시나리오에 충격 계수를 적용하여 스트레스 테스트를 수행합니다.
+
+    각 시나리오별로 재무 지표에 충격을 적용하고, 변화된 Z-Score를 계산합니다.
+
+    Args:
+        financial_data: Node 1에서 추출한 재무 데이터 dict
+            {
+                "debt_ratio": 부채비율(%),
+                "liquidity_ratio": 유동비율(%),
+                "ar_turnover": 매출채권 회전율(배),
+                "operating_cash_flow": 영업현금흐름(원),
+                "net_income": 순이익(원),
+                ...
+            }
+        scenario: "crisis_2008" | "covid19" | "rate_hike" | "industry_decline"
+
+    Returns:
+        {
+            "scenario": str,                      # 선택된 시나리오
+            "scenario_name": str,                 # 시나리오 한글명
+            "shocked_metrics": dict,              # 충격 적용된 지표들
+            "original_z_score": float,            # 기존 Z-Score
+            "shocked_z_score": float,             # 시나리오 적용 후 Z-Score
+            "resilience": str,                    # "견딜 수 있음" | "위험" | "심각"
+            "change_percentage": float,           # Z-Score 변화율(%)
+            "recommendation": str                 # 결론 및 권고사항
+        }
+
+    시나리오별 충격 계수:
+    - crisis_2008: debt_ratio +30%, liquidity_ratio -30%
+    - covid19: operating_cash_flow -40%, net_income -35%
+    - rate_hike: liquidity_ratio -20%, interest_expense +50%
+    - industry_decline: operating_cash_flow -30%, net_income -25%
+
+    Z-Score 판정 기준:
+    - Z > 2.99: "견딜 수 있음" (안전)
+    - 1.81 < Z <= 2.99: "위험" (그레이존)
+    - Z <= 1.81: "심각" (위기)
+    """
+
+    # 시나리오별 충격 계수 (곱하기 방식)
+    shock_scenarios = {
+        "crisis_2008": {
+            "debt_ratio": 1.3,             # +30%
+            "liquidity_ratio": 0.7,        # -30%
+            "ar_turnover": 0.9,            # -10%
+            "operating_cash_flow": 0.8,    # -20%
+            "net_income": 0.7              # -30%
+        },
+        "covid19": {
+            "debt_ratio": 1.1,             # +10%
+            "liquidity_ratio": 0.85,       # -15%
+            "ar_turnover": 0.9,            # -10%
+            "operating_cash_flow": 0.6,    # -40%
+            "net_income": 0.65             # -35%
+        },
+        "rate_hike": {
+            "debt_ratio": 1.15,            # +15%
+            "liquidity_ratio": 0.8,        # -20%
+            "ar_turnover": 0.95,           # -5%
+            "operating_cash_flow": 0.9,    # -10%
+            "net_income": 0.85             # -15%
+        },
+        "industry_decline": {
+            "debt_ratio": 1.1,             # +10%
+            "liquidity_ratio": 0.85,       # -15%
+            "ar_turnover": 0.85,           # -15%
+            "operating_cash_flow": 0.7,    # -30%
+            "net_income": 0.75             # -25%
+        }
+    }
+
+    scenario_names = {
+        "crisis_2008": "2008년 금융위기",
+        "covid19": "COVID-19 팬데믹",
+        "rate_hike": "금리 상승",
+        "industry_decline": "산업 침체"
+    }
+
+    if scenario not in shock_scenarios:
+        return {"error": f"Unknown scenario: {scenario}"}
+
+    shocks = shock_scenarios[scenario]
+    scenario_name = scenario_names.get(scenario, scenario)
+
+    # 기존 Z-Score 계산
+    original_z_score = _calculate_z_score_from_financial_data(financial_data)
+
+    # 충격 계수 적용하여 shocked_metrics 생성
+    shocked_metrics = {}
+    for key, value in financial_data.items():
+        if key in shocks and value is not None:
+            shocked_metrics[key] = value * shocks[key]
+        else:
+            shocked_metrics[key] = value
+
+    # 변화된 Z-Score 계산
+    shocked_z_score = _calculate_z_score_from_financial_data(shocked_metrics)
+
+    # Z-Score 변화율 계산
+    if original_z_score > 0:
+        change_percentage = ((shocked_z_score - original_z_score) / original_z_score) * 100
+    else:
+        change_percentage = 0
+
+    # Resilience 판정
+    if shocked_z_score > 2.99:
+        resilience = "견딜 수 있음"
+        resilience_detail = "기업은 이 위기 상황에서 충분한 회복력을 보유하고 있습니다."
+    elif shocked_z_score > 1.81:
+        resilience = "위험"
+        resilience_detail = "기업의 재무 건강도가 악화되어 주의가 필요합니다."
+    else:
+        resilience = "심각"
+        resilience_detail = "기업은 이 위기 상황에서 심각한 재무 어려움에 직면할 수 있습니다."
+
+    # 권고사항 생성
+    recommendation = (
+        f"【{scenario_name}】 시나리오 스트레스 테스트 결과:\n\n"
+        f"▸ 기존 Z-Score: {original_z_score:.2f}\n"
+        f"▸ 시나리오 적용 후 Z-Score: {shocked_z_score:.2f}\n"
+        f"▸ 변화율: {change_percentage:+.1f}%\n"
+        f"▸ 회복력 평가: 【{resilience}】\n\n"
+        f"{resilience_detail}\n\n"
+        f"기업은 다음과 같은 사항을 점검하시기 바랍니다:\n"
+        f"① 부채 관리 및 이자비용 커버율 개선\n"
+        f"② 운영현금흐름 안정성 확보\n"
+        f"③ 유동성 버퍼(현금성자산) 확충\n"
+        f"④ 매출채권 관리 개선"
+    )
+
+    return {
+        "scenario": scenario,
+        "scenario_name": scenario_name,
+        "shocked_metrics": shocked_metrics,
+        "original_z_score": round(original_z_score, 2),
+        "shocked_z_score": round(shocked_z_score, 2),
+        "resilience": resilience,
+        "change_percentage": round(change_percentage, 1),
+        "recommendation": recommendation
+    }
+
+
+def _calculate_z_score_from_financial_data(financial_data: dict) -> float:
+    """
+    재무 데이터로부터 Z-Score를 계산합니다.
+
+    Node 1의 financial_rule_engine() 로직을 기반으로 risk_scores를 계산하고,
+    이를 Z-Score(0-4 범위)로 변환합니다.
+
+    Args:
+        financial_data: 재무 지표 dict
+
+    Returns:
+        float: Z-Score (0-4 범위)
+    """
+
+    risk_scores = {
+        "revenue_quality": 20,
+        "liquidity_stress": 20,
+        "leverage_risk": 20,
+    }
+
+    # Revenue Quality 점수 계산
+    try:
+        ar_turnover = financial_data.get("ar_turnover")
+        ocf = financial_data.get("operating_cash_flow")
+
+        revenue_quality_score = 20
+
+        if ar_turnover is not None:
+            if ar_turnover < 2:
+                revenue_quality_score = 70
+            elif ar_turnover < 4:
+                revenue_quality_score = 50
+            else:
+                revenue_quality_score = 20
+
+        if ocf is not None and ocf < 0:
+            revenue_quality_score = max(revenue_quality_score, 85)
+
+        risk_scores["revenue_quality"] = revenue_quality_score
+    except:
+        pass
+
+    # Liquidity Stress 점수 계산
+    try:
+        liquidity_ratio = financial_data.get("liquidity_ratio")
+
+        liquidity_score = 20
+
+        if liquidity_ratio is not None:
+            if liquidity_ratio < 100:
+                liquidity_score = 90
+            elif liquidity_ratio < 150:
+                liquidity_score = 60
+            else:
+                liquidity_score = 20
+
+        risk_scores["liquidity_stress"] = liquidity_score
+    except:
+        pass
+
+    # Leverage Risk 점수 계산
+    try:
+        debt_ratio = financial_data.get("debt_ratio")
+
+        leverage_score = 20
+
+        if debt_ratio is not None:
+            if debt_ratio > 200:
+                leverage_score = 80
+            elif debt_ratio > 160:
+                leverage_score = 50
+            else:
+                leverage_score = 20
+
+        risk_scores["leverage_risk"] = leverage_score
+    except:
+        pass
+
+    # 종합 financial_risk_score 계산 (0-100)
+    financial_risk_score = (
+        risk_scores["revenue_quality"] * 0.40 +
+        risk_scores["liquidity_stress"] * 0.35 +
+        risk_scores["leverage_risk"] * 0.25
+    )
+
+    # Z-Score로 변환 (0-4 범위)
+    # risk_score 0 → z_score 4 (안전)
+    # risk_score 100 → z_score 0 (위기)
+    z_score = 4 - (financial_risk_score / 25)
+
+    return z_score
+
+# ============================================================================
+# 연도별 재무 위험도 추세 조회 (5년 실제 데이터)
+# ============================================================================
+
+@st.cache_data(ttl=3600)
+def get_financial_risk_trend(_dart, corp_code):
+    """
+    5년간(2020-2024)의 실제 재무 위험도 추세를 조회합니다.
+
+    Args:
+        dart: OpenDartReader 인스턴스
+        corp_code: 기업 코드
+
+    Returns:
+        dict: {
+            2020: 35.2,
+            2021: 38.5,
+            2022: 40.1,
+            2023: 42.3,
+            2024: 32.0,
+            "status": "완료 | 부분 | 오류"
+        }
+    """
+
+    import time
+
+    trend_scores = {}
+    years = [2020, 2021, 2022, 2023, 2024]
+    success_count = 0
+    error_count = 0
+
+    for year in years:
+        try:
+            year_str = str(year)
+
+            # DART에서 해당 연도 재무제표 조회
+            fs_data = _dart.finstate_all(corp_code, year_str)
+
+            if fs_data is None or fs_data.empty:
+                trend_scores[year] = None
+                error_count += 1
+            else:
+                # 위험도 점수 계산 (financial_rule_engine 재사용)
+                analysis = financial_rule_engine(fs_data)
+                trend_scores[year] = round(analysis['financial_risk_score'], 1)
+                success_count += 1
+
+            # API 호출 제한 회피 (연도별 1초 대기)
+            time.sleep(1)
+
+        except Exception as e:
+            # 개별 연도 오류는 무시하고 계속 진행
+            trend_scores[year] = None
+            error_count += 1
+
+    # 조회 상태 판정
+    if success_count == 5:
+        status = "완료"
+    elif success_count > 0:
+        status = "부분"
+    else:
+        status = "오류"
+
+    trend_scores["status"] = status
+    return trend_scores
+
+# ============================================================================
+# UI - 사이드바 공통 (제거됨)
+# ============================================================================
 
 # ============================================================================
 # UI - 초기 화면 vs 분석 결과
@@ -860,14 +1269,33 @@ elif st.session_state.get("fetch_triggered", False):
 
     risk_categories = extract_risk_categories(caveats)
 
-    tab1, tab2, tab3 = st.tabs(["정량 재무 분석", "정성적 크로스체킹", "주석 기반 리스크"])
+    # 정성 점수 계산
+    qualitative_risk = extract_qualitative_risk_score(risk_categories)
+
+    # 최종 통합 점수 계산
+    final_risk = integrate_final_risk_grade(
+        analysis['financial_risk_score'],
+        qualitative_risk['qualitative_risk_score']
+    )
+
+    # 5년 실제 위험도 추세 조회 (DART 기반)
+    trend_scores = None
+    with st.spinner("5년 위험도 추세 조회 중... (최초 1회만 수행)"):
+        try:
+            trend_scores = get_financial_risk_trend(dart, corp_code)
+        except Exception as e:
+            st.warning(f"추세 데이터 조회 오류: {e}")
+            trend_scores = None
+
+    tab1, tab2, tab3, tab4 = st.tabs(["종합 리스크 대시보드", "정량 재무 분석", "정성적 크로스체킹", "리스크 시나리오"])
 
     # ========================================================================
-    # Tab 1: 정량 재무 분석
+    # Tab 1: 종합 리스크 대시보드 (통합 대시보드)
     # ========================================================================
     with tab1:
-        st.markdown('<div class="section-header">정량 규칙 엔진 기반 회계 리스크 점수</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">최종 위험 평가</div>', unsafe_allow_html=True)
 
+        # 기업 기본 정보
         with st.container(border=True):
             st.markdown("**기업 기본 정보**")
             info_col1, info_col2, info_col3, info_col4 = st.columns(4)
@@ -883,13 +1311,276 @@ elif st.session_state.get("fetch_triggered", False):
 
         st.markdown("")
 
+        # [상단] 최종 위험 등급 강조 표시
+        final_score = final_risk['final_integrated_score']
+        final_grade = final_risk['final_risk_grade']
+        color = final_risk['color']
+
+        color_map = {
+            "red": "#c41c3b",
+            "orange": "#f57c00",
+            "green": "#2e7d32"
+        }
+
+        grade_map = {
+            "HIGH_RISK": "고위험",
+            "MEDIUM_RISK": "중위험",
+            "LOW_RISK": "저위험"
+        }
+
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba({int(color_map[color][1:3], 16)}, {int(color_map[color][3:5], 16)}, {int(color_map[color][5:7], 16)}, 0.1) 0%, rgba({int(color_map[color][1:3], 16)}, {int(color_map[color][3:5], 16)}, {int(color_map[color][5:7], 16)}, 0.05) 100%);
+                    border-left: 5px solid {color_map[color]};
+                    padding: 24px;
+                    border-radius: 8px;
+                    margin: 20px 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <p style="font-size: 1.2em; font-weight: 600; margin: 0; color: #1b4332;">최종 위험 등급</p>
+                    <p style="font-size: 2.5em; font-weight: 700; margin: 10px 0 0 0; color: {color_map[color]};">{grade_map[final_grade]}</p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="font-size: 3em; font-weight: 700; color: {color_map[color]}; margin: 0;">{final_score}</p>
+                    <p style="font-size: 1em; color: #666; margin: 5px 0 0 0;">/100</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(final_risk['explanation'])
+        st.markdown("")
+
+        # [중단] 정량 vs 정성 비교
+        st.markdown('<div class="section-header">정량 vs 정성 위험도 비교</div>', unsafe_allow_html=True)
+
+        col_quant, col_qual = st.columns(2)
+
+        with col_quant:
+            with st.container(border=True):
+                st.markdown("### 📊 정량 위험도")
+                st.metric(
+                    "재무 지표 기반",
+                    f"{analysis['financial_risk_score']:.1f}",
+                    help="부채비율, 유동성, 현금흐름 등 정량 지표"
+                )
+                st.caption(f"평가: {analysis['risk_level']}")
+
+                # 정량 위험도 구성 검증
+                revenue_score = analysis['component_scores']['revenue_quality']
+                liquidity_score = analysis['component_scores']['liquidity_stress']
+                leverage_score = analysis['component_scores']['leverage_risk']
+                final_score = analysis['financial_risk_score']
+
+                st.caption(
+                    f"💡 **정량 위험도 구성 (가중치)**:\n"
+                    f"   • 매출채권 회전율: {revenue_score:.0f}점 (40%)\n"
+                    f"   • 유동비율: {liquidity_score:.0f}점 (35%)\n"
+                    f"   • 부채비율: {leverage_score:.0f}점 (25%)\n"
+                    f"   • 최종 점수: {final_score:.1f} = "
+                    f"({revenue_score:.0f} × 0.40) + ({liquidity_score:.0f} × 0.35) + ({leverage_score:.0f} × 0.25)"
+                )
+
+        with col_qual:
+            with st.container(border=True):
+                st.markdown("### 📋 정성 위험도")
+                st.metric(
+                    "공시 주석 기반",
+                    f"{qualitative_risk['qualitative_risk_score']:.1f}",
+                    help="소송, 특수관계자거래, 자산손상 등"
+                )
+                st.caption(f"발견된 리스크 카테고리: {qualitative_risk['risk_count']}개")
+
+                # 정성 점수 검증 정보
+                breakdown = qualitative_risk['risk_breakdown']
+                con_liab = breakdown.get('contingent_liabilities', 0)
+                rel_party = breakdown.get('related_party_transactions', 0)
+                asset_imp = breakdown.get('asset_impairment', 0)
+
+                st.caption(f"📐 우발채무 & 소송: {con_liab}개")
+                st.caption(f"📐 특수관계자거래: {rel_party}개")
+                st.caption(f"📐 자산손상: {asset_imp}개")
+                st.caption(f"💡 계산: {qualitative_risk['risk_count']} × 25 = {qualitative_risk['qualitative_risk_score']:.1f}점")
+
+        st.markdown("")
+        st.markdown("---")
+
+        # [중단] 지난 5년 위험도 추세 (DART 실제 데이터)
+        st.markdown('<div class="section-header">📈 지난 5년 위험도 추세 (DART 공시 기반 실제 데이터)</div>', unsafe_allow_html=True)
+
+        try:
+            import pandas as pd
+            import plotly.graph_objects as go
+
+            # 실제 데이터 조회 여부 확인
+            has_real_data = trend_scores is not None and trend_scores.get("status") != "오류"
+
+            if has_real_data:
+                # 실제 DART 데이터로 그래프 생성
+                years = [2020, 2021, 2022, 2023, 2024]
+                scores = []
+                valid_years = []
+
+                for year in years:
+                    score = trend_scores.get(year)
+                    if score is not None:
+                        scores.append(score)
+                        valid_years.append(year)
+
+                if len(valid_years) > 0:
+                    # Plotly 인터랙티브 그래프
+                    fig = go.Figure()
+
+                    # 실제 데이터 라인
+                    fig.add_trace(go.Scatter(
+                        x=valid_years,
+                        y=scores,
+                        mode='lines+markers',
+                        name='위험도 추세',
+                        line=dict(color='#2d6a4f', width=3),
+                        marker=dict(size=10, color='#2d6a4f'),
+                        hovertemplate='<b>%{x}년</b><br>위험도: %{y:.1f}<extra></extra>'
+                    ))
+
+                    # 최신 연도 강조 (2024)
+                    if 2024 in valid_years:
+                        idx = valid_years.index(2024)
+                        fig.add_trace(go.Scatter(
+                            x=[2024],
+                            y=[scores[idx]],
+                            mode='markers+text',
+                            name='최신 데이터 (2024)',
+                            marker=dict(size=16, color='#c41c3b', symbol='star',
+                                       line=dict(color='#1b4332', width=2)),
+                            text=['최신'],
+                            textposition='top center',
+                            textfont=dict(color='#c41c3b', size=12),
+                            hovertemplate='<b>2024 (최신)</b><br>위험도: %{y:.1f}<extra></extra>'
+                        ))
+
+                    # 레이아웃 설정
+                    fig.update_layout(
+                        title='',
+                        xaxis_title='연도',
+                        yaxis_title='위험도 점수 (0-100)',
+                        hovermode='x unified',
+                        template='plotly_white',
+                        height=340,
+                        showlegend=True,
+                        legend=dict(x=0.02, y=0.98),
+                        yaxis=dict(range=[0, 100]),
+                        xaxis=dict(tickmode='linear', tick0=2020, dtick=1),
+                        margin=dict(l=60, r=60, t=20, b=60),
+                        font=dict(family="Pretendard, sans-serif")
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # 그래프 설명
+                    st.success(
+                        "✅ **DART 공시 기반 실제 데이터입니다**\n\n"
+                        "📊 본 그래프는 연도별 DART 공시 재무제표에서 추출한 실제 위험도 추세입니다.\n"
+                        "💡 각 연도의 위험도 변화 추이를 통해 기업의 재무 건전성 개선/악화 추세를 확인할 수 있습니다."
+                    )
+
+                    # 조회 상태 표시
+                    if trend_scores.get("status") == "부분":
+                        st.warning(f"⚠️ 일부 연도의 데이터를 조회하지 못했습니다. (조회 완료: {len(valid_years)}/5년)")
+                else:
+                    st.warning("📊 그래프를 표시할 유효한 데이터가 없습니다.")
+            else:
+                # 실제 데이터 조회 실패
+                st.warning(
+                    "⚠️ **DART 5년 데이터 조회 실패**\n\n"
+                    "현재 DART API에서 과거 연도 재무제표를 모두 조회할 수 없었습니다.\n"
+                    "현재 2024년 데이터만 사용 중입니다.\n\n"
+                    "과거 5년 추이를 확인하려면:\n"
+                    "1. DART 웹사이트 방문 (dart.fss.or.kr)\n"
+                    "2. 기업명으로 검색\n"
+                    "3. 연도별 공시 보고서에서 위험도 지표 확인"
+                )
+
+        except Exception as e:
+            st.error(f"그래프 생성 오류: {e}")
+
+        st.markdown("")
+        st.markdown("---")
+
+        # [하단] 주요 위험 요인
+        st.markdown('<div class="section-header">주요 위험 요인</div>', unsafe_allow_html=True)
+
+        risk_data = risk_categories
+
+        with st.container(border=True):
+            col_risks1, col_risks2 = st.columns(2)
+
+            with col_risks1:
+                st.subheader("우발채무 & 소송")
+                if risk_data["contingent_liabilities"]:
+                    for item in risk_data["contingent_liabilities"][:3]:
+                        st.caption(f"⚠️ {item}")
+                else:
+                    st.caption("✓ 확인된 항목 없음")
+
+                st.subheader("특수관계자 거래")
+                if risk_data["related_party_transactions"]:
+                    for item in risk_data["related_party_transactions"][:3]:
+                        st.caption(f"⚠️ {item}")
+                else:
+                    st.caption("✓ 확인된 항목 없음")
+
+            with col_risks2:
+                st.subheader("자산손상 & 투자손실")
+                if risk_data["asset_impairment"]:
+                    for item in risk_data["asset_impairment"][:3]:
+                        st.caption(f"⚠️ {item}")
+                else:
+                    st.caption("✓ 확인된 항목 없음")
+
+                st.subheader("정성 평가")
+                if risk_data["investment_assessment"]:
+                    st.caption(risk_data["investment_assessment"][:150] + "...")
+                else:
+                    st.caption("✓ 확인된 항목 없음")
+
+        st.markdown("")
+        st.markdown("---")
+
+        # [하단] 조기 경보
+        st.markdown('<div class="section-header">⚡ 조기 경보</div>', unsafe_allow_html=True)
+
+        if final_score > 70:
+            st.error(
+                "🚨 **고위험 판정**\n\n"
+                "정량 및 정성 분석 결과 이 기업은 현저한 재무 리스크를 보유하고 있습니다. "
+                "즉시적인 재무 상태 점검 및 추가 실사(Due Diligence)를 권장합니다."
+            )
+        elif final_score > 50:
+            st.warning(
+                "⚠️ **중위험 판정**\n\n"
+                "특정 재무 지표 및 공시 항목에서 주의가 필요합니다. "
+                "경영진의 개선 계획 및 공시 주석을 면밀히 검토하시기 바랍니다."
+            )
+        else:
+            st.success(
+                "✅ **저위험 판정**\n\n"
+                "정량 및 정성 분석상 기업의 재무 건전성은 양호한 수준입니다. "
+                "다만 정기적인 모니터링을 권장드립니다."
+            )
+
+    # ========================================================================
+    # Tab 2: 정량 재무 분석
+    # ========================================================================
+    with tab2:
+        st.markdown('<div class="section-header">정량 규칙 엔진 기반 회계 리스크 점수</div>', unsafe_allow_html=True)
+
+        # 상세 지표
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
             risk_score = analysis['financial_risk_score']
             st.metric(
-                "종합 위험도",
-                f"{risk_score}/100",
+                "정량 위험도",
+                f"{risk_score:.1f}",
                 delta=analysis['risk_level'],
                 delta_color="inverse",
                 help="높을수록 리스크가 높음"
@@ -898,23 +1589,135 @@ elif st.session_state.get("fetch_triggered", False):
         with col2:
             st.metric(
                 "매출 질 점수",
-                f"{analysis['component_scores']['revenue_quality']}/100",
+                f"{analysis['component_scores']['revenue_quality']:.0f}",
                 help="매출채권 회전율, 영업현금흐름"
             )
 
         with col3:
             st.metric(
                 "유동성 점수",
-                f"{analysis['component_scores']['liquidity_stress']}/100",
+                f"{analysis['component_scores']['liquidity_stress']:.0f}",
                 help="단기유동성 압박도"
             )
 
         with col4:
             st.metric(
                 "부채 점수",
-                f"{analysis['component_scores']['leverage_risk']}/100",
+                f"{analysis['component_scores']['leverage_risk']:.0f}",
                 help="부채비율 및 자본 구조"
             )
+
+        st.markdown("")
+        st.markdown("---")
+
+        # 수익성 지표 섹션
+        st.markdown('<div class="section-header">수익성 지표</div>', unsafe_allow_html=True)
+
+        try:
+            if financial_df is not None:
+                net_income = find_account_value(financial_df, ['순이익', '당기순이익', 'net_income']) or 1
+                total_assets = find_account_value(financial_df, ['자산총계', '총자산']) or 1
+
+                # 자기자본 찾기 (우선순위: 자기자본총계 → 주주자본 → 자산-부채 → 자본금)
+                equity = (
+                    find_account_value(financial_df, ['자기자본 총계', '자기자본합계']) or
+                    find_account_value(financial_df, ['주주자본 총계', '주주자본합계']) or
+                    find_account_value(financial_df, ['자기자본', '주주자본']) or
+                    None
+                )
+
+                # 자기자본을 못 찾으면 자산 - 부채로 계산
+                if not equity:
+                    total_debt = find_account_value(financial_df, ['부채총계', '총부채'])
+                    if total_debt:
+                        equity = total_assets - total_debt
+
+                # 그래도 못 찾으면 자본금 사용 (권장되지 않음)
+                if not equity:
+                    equity = find_account_value(financial_df, ['자본금'])
+
+                equity = equity or 1
+
+                roe = (net_income / equity * 100) if equity > 0 else 0
+                roa = (net_income / total_assets * 100) if total_assets > 0 else 0
+            else:
+                roe = 0
+                roa = 0
+        except:
+            roe = 0
+            roa = 0
+
+        # 등급 판정 함수
+        def get_profitability_grade(value, metric_type="roe"):
+            if metric_type == "roe":
+                if value > 15:
+                    return "우수", "🟢"
+                elif value >= 10:
+                    return "정상", "🔵"
+                else:
+                    return "낮음", "🟠"
+            else:  # roa
+                if value > 5:
+                    return "우수", "🟢"
+                elif value >= 2:
+                    return "정상", "🔵"
+                else:
+                    return "낮음", "🟠"
+
+        roe_grade, roe_emoji = get_profitability_grade(roe, "roe")
+        roa_grade, roa_emoji = get_profitability_grade(roa, "roa")
+
+        col_roe, col_roa = st.columns(2)
+
+        with col_roe:
+            with st.container(border=True):
+                st.markdown("### ROE (자기자본수익률)")
+                st.metric(
+                    "수익률",
+                    f"{roe:.2f}%",
+                    help="순이익 / 자기자본 × 100\n높을수록 좋음\n(자기자본 = 자본금 + 잉여금 등)"
+                )
+                st.markdown(f"**평가:** {roe_emoji} {roe_grade}")
+                if roe > 15:
+                    st.success("자기자본 대비 수익성이 우수합니다.")
+                elif roe >= 10:
+                    st.info("자기자본 대비 수익성이 정상 수준입니다.")
+                else:
+                    st.warning("자기자본 대비 수익성이 낮습니다.")
+
+                # ROE 검증 정보
+                try:
+                    net_income_roe = find_account_value(financial_df, ['순이익', '당기순이익', 'net_income']) or 0
+                    equity_roe = find_account_value(financial_df, ['자기자본 총계', '자기자본합계']) or find_account_value(financial_df, ['자기자본']) or 1
+                    st.caption(f"📐 계산식: 순이익 / 자기자본 × 100")
+                    st.caption(f"💡 값: {net_income_roe:,.0f}원 / {equity_roe:,.0f}원 × 100")
+                except:
+                    pass
+
+        with col_roa:
+            with st.container(border=True):
+                st.markdown("### ROA (자산수익률)")
+                st.metric(
+                    "수익률",
+                    f"{roa:.2f}%",
+                    help="순이익 / 총자산 × 100\n높을수록 좋음"
+                )
+                st.markdown(f"**평가:** {roa_emoji} {roa_grade}")
+                if roa > 5:
+                    st.success("자산 활용 효율이 우수합니다.")
+                elif roa >= 2:
+                    st.info("자산 활용 효율이 정상 수준입니다.")
+                else:
+                    st.warning("자산 활용 효율이 낮습니다.")
+
+                # ROA 검증 정보
+                try:
+                    net_income_roa = find_account_value(financial_df, ['순이익', '당기순이익', 'net_income']) or 0
+                    total_assets_roa = find_account_value(financial_df, ['자산총계', '총자산']) or 1
+                    st.caption(f"📐 계산식: 순이익 / 총자산 × 100")
+                    st.caption(f"💡 값: {net_income_roa:,.0f}원 / {total_assets_roa:,.0f}원 × 100")
+                except:
+                    pass
 
         st.markdown("")
         st.markdown("---")
@@ -931,7 +1734,7 @@ elif st.session_state.get("fetch_triggered", False):
         st.markdown("")
         st.markdown("---")
 
-        st.markdown('<div class="section-header">정량 리스크 평가 총평</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">정량 리스크 평가</div>', unsafe_allow_html=True)
 
         with st.container(border=True):
             risk_score = analysis['financial_risk_score']
@@ -945,10 +1748,36 @@ elif st.session_state.get("fetch_triggered", False):
 
             st.markdown(assessment)
 
+        st.markdown("")
+        st.markdown("---")
+
+        # 정성 점수 추가
+        st.markdown('<div class="section-header">정성 위험도 보완 지표</div>', unsafe_allow_html=True)
+
+        with st.container(border=True):
+            st.metric(
+                "정성 위험도 점수",
+                f"{qualitative_risk['qualitative_risk_score']:.1f}",
+                help="공시 주석에서 발견된 우발채무, 특수관계자거래, 자산손상 등"
+            )
+            st.caption(f"발견된 리스크 카테고리: {qualitative_risk['risk_count']}개")
+            st.caption(f"카테고리별 분석:")
+
+            breakdown = qualitative_risk['risk_breakdown']
+            col_breakdown1, col_breakdown2 = st.columns(2)
+
+            with col_breakdown1:
+                st.caption(f"• 우발채무 & 소송: {breakdown.get('contingent_liabilities', 0)}개")
+                st.caption(f"• 특수관계자거래: {breakdown.get('related_party_transactions', 0)}개")
+
+            with col_breakdown2:
+                st.caption(f"• 자산손상 & 투자손실: {breakdown.get('asset_impairment', 0)}개")
+                st.caption(f"• 최종 평가: {'있음' if breakdown.get('investment_assessment', 0) else '없음'}")
+
     # ========================================================================
-    # Tab 2: 정성적 크로스체킹
+    # Tab 3: 정성적 크로스체킹
     # ========================================================================
-    with tab2:
+    with tab3:
         st.markdown('<div class="section-header">K-IFRS 기준 재무 건전성 검증</div>', unsafe_allow_html=True)
 
         col_left, col_right = st.columns(2)
@@ -964,54 +1793,120 @@ elif st.session_state.get("fetch_triggered", False):
                 st.markdown(caveats)
 
     # ========================================================================
-    # Tab 3: 주석 기반 리스크
+    # Tab 4: 리스크 시나리오 분석
     # ========================================================================
-    with tab3:
-        st.markdown('<div class="section-header">주석 기반 리스크 세부 분석</div>', unsafe_allow_html=True)
+    with tab4:
+        st.markdown('<div class="section-header">스트레스 테스트: 위기 시나리오 분석</div>', unsafe_allow_html=True)
 
-        with st.expander("우발채무 및 계류 중인 소송", expanded=False):
-            if risk_categories["contingent_liabilities"]:
-                for item in risk_categories["contingent_liabilities"]:
-                    st.markdown(f"- {item}")
-            else:
-                st.markdown("""
-본 분석에서 추적하는 항목:
-- 진행 중인 소송 및 분쟁 사건
-- 미결제 우발채무 규모 및 해결 시점
-- 법적 리스크의 불확실성
-                """)
+        st.markdown("과거 위기 시나리오를 적용했을 때 기업의 재무 회복력을 평가합니다.")
+        st.markdown("")
 
-        with st.expander("특수관계자 거래 및 자금 이동", expanded=False):
-            if risk_categories["related_party_transactions"]:
-                for item in risk_categories["related_party_transactions"]:
-                    st.markdown(f"- {item}")
-            else:
-                st.markdown("""
-본 분석에서 추적하는 항목:
-- 지배주주·경영진·계열사 간 자금 이동
-- 부당한 거래 가격 책정의 가능성
-- 담보·보증 약정의 투명성
-                """)
+        # 시나리오 선택
+        scenario_options = {
+            "crisis_2008": "2008년 금융위기",
+            "covid19": "COVID-19 팬데믹",
+            "rate_hike": "금리 상승",
+            "industry_decline": "산업 침체"
+        }
 
-        with st.expander("자산손상차손 및 투자 손실", expanded=False):
-            if risk_categories["asset_impairment"]:
-                for item in risk_categories["asset_impairment"]:
-                    st.markdown(f"- {item}")
+        selected_scenario = st.selectbox(
+            "위기 시나리오를 선택하세요",
+            options=list(scenario_options.keys()),
+            format_func=lambda x: scenario_options[x],
+            key="scenario_select"
+        )
+
+        st.markdown("")
+
+        # 재무 데이터 준비 (Node 1 분석 결과에서 추출)
+        try:
+            if financial_df is not None:
+                sales = find_account_value(financial_df, ['매출액', '매출', 'revenue']) or 1
+                ar = find_account_value(financial_df, ['매출채권', '기타채권']) or 1
+                ocf = find_account_value(financial_df, ['영업활동', '영업현금']) or 0
+                current_assets = find_account_value(financial_df, ['유동자산']) or 1
+                current_liabilities = find_account_value(financial_df, ['유동부채']) or 1
+                total_assets = find_account_value(financial_df, ['자산총계']) or 1
+                total_debt = find_account_value(financial_df, ['부채총계']) or 1
+
+                debt_ratio = (total_debt / (total_assets - total_debt) * 100) if (total_assets - total_debt) > 0 else 100
+                liquidity_ratio = (current_assets / current_liabilities * 100) if current_liabilities > 0 else 100
+                ar_turnover = (sales / ar) if ar > 0 else 2
+
+                financial_data = {
+                    "debt_ratio": debt_ratio,
+                    "liquidity_ratio": liquidity_ratio,
+                    "ar_turnover": ar_turnover,
+                    "operating_cash_flow": ocf,
+                    "net_income": 0
+                }
             else:
-                st.markdown("""
-본 분석에서 추적하는 항목:
-- M&A 및 인수 자산의 부진 현황
-- 무형자산 및 투자 손상 규모
-- 손상 인식의 적절성 평가
-                """)
+                raise ValueError("재무 데이터 없음")
+        except:
+            financial_data = {
+                "debt_ratio": 100,
+                "liquidity_ratio": 150,
+                "ar_turnover": 4.0,
+                "operating_cash_flow": 0,
+                "net_income": 0
+            }
+
+        # 스트레스 테스트 실행
+        stress_result = scenario_stress_test(financial_data, selected_scenario)
+
+        # 결과 표시
+        st.markdown(f"**시나리오: {stress_result['scenario_name']}**")
+        st.markdown("")
+
+        # 기존 vs 변화된 Z-Score 비교
+        col_z1, col_z2, col_z3 = st.columns(3)
+
+        with col_z1:
+            st.metric(
+                "기존 Z-Score",
+                f"{stress_result['original_z_score']:.2f}",
+                help="시나리오 적용 전"
+            )
+
+        with col_z2:
+            st.metric(
+                "변화된 Z-Score",
+                f"{stress_result['shocked_z_score']:.2f}",
+                help="시나리오 적용 후"
+            )
+
+        with col_z3:
+            st.metric(
+                "변화율",
+                f"{stress_result['change_percentage']:+.1f}%",
+                help="Z-Score 변화 %"
+            )
 
         st.markdown("")
         st.markdown("---")
 
-        st.markdown('<div class="conclusion-box">최종 평가 및 권고</div>', unsafe_allow_html=True)
+        # Resilience 판정
+        resilience = stress_result['resilience']
+        resilience_colors = {
+            "견딜 수 있음": "green",
+            "위험": "orange",
+            "심각": "red"
+        }
+
+        st.markdown(f"### 🎯 회복력 평가: **{resilience}**")
+
+        if resilience == "견딜 수 있음":
+            st.success("기업은 이 위기 상황에서 충분한 회복력을 보유하고 있습니다.")
+        elif resilience == "위험":
+            st.warning("기업의 재무 건강도가 악화되어 주의가 필요합니다.")
+        else:
+            st.error("기업은 이 위기 상황에서 심각한 재무 어려움에 직면할 수 있습니다.")
+
+        st.markdown("")
+        st.markdown("---")
+
+        # 권고사항
+        st.markdown('<div class="section-header">권고사항</div>', unsafe_allow_html=True)
 
         with st.container(border=True):
-            if risk_categories["investment_assessment"]:
-                st.markdown(risk_categories["investment_assessment"])
-            else:
-                st.markdown("최종 평가를 도출하기 위해 상기 정량 분석과 정성 검증을 종합하여 투자 여부를 판단하십시오.")
+            st.markdown(stress_result['recommendation'])
