@@ -691,121 +691,89 @@ def stakeholder_caveats(corp_name: str, mgmt_response: str, notes: str, analysis
 
 def extract_risk_categories(caveats_text: str) -> dict:
     """
-    Claude가 생성한 이해관계자 보고서에서 구조화된 리스크 정보를 추출합니다.
-    각 카테고리별로 근거, 평가, 점수 반영 정보를 함께 추출합니다.
+    Claude 정성 분석 텍스트에서 리스크 항목 개수를 추출합니다.
+    간단한 키워드 기반 계산으로 robust함을 확보합니다.
     """
     categories = {
         "contingent_liabilities": [],
-        "contingent_liabilities_details": [],  # "구체적 근거→평가→점수 반영" 전체 텍스트
+        "contingent_liabilities_details": [],
         "related_party_transactions": [],
         "related_party_transactions_details": [],
         "asset_impairment": [],
         "asset_impairment_details": [],
         "investment_assessment": "",
-        "final_recommendation": ""  # 최종 추천
     }
 
     if not caveats_text or len(caveats_text) < 50:
         return categories
 
-    lines = caveats_text.split('\n')
-    current_section = None
-    section_content = []
+    # 전체 텍스트를 소문자로 변환 (대소문자 구분 없이)
+    text_lower = caveats_text.lower()
+    text = caveats_text
 
-    for i, line in enumerate(lines):
-        line_clean = line.strip()
+    # ===== 간단한 방식: 섹션별로 텍스트 분할 =====
+    sections = {
+        "contingent": [],
+        "related": [],
+        "asset": []
+    }
 
-        if not line_clean:
-            # 빈 줄이면 섹션 끝
-            if section_content and current_section:
-                full_text = '\n'.join(section_content)
-                # 섹션별로 저장
-                if '우발' in current_section or '소송' in current_section:
-                    categories["contingent_liabilities_details"].append(full_text)
-                elif '특수' in current_section or '관계자' in current_section:
-                    categories["related_party_transactions_details"].append(full_text)
-                elif '자산' in current_section or '손상' in current_section:
-                    categories["asset_impairment_details"].append(full_text)
-                section_content = []
-            continue
+    # 우발채무 섹션 추출
+    if '우발' in text or '소송' in text:
+        # 우발 또는 소송 관련 문장 추출
+        lines = text.split('\n')
+        for line in lines:
+            if any(kw in line for kw in ['우발', '소송', '분쟁', '법적', '청구']):
+                sections["contingent"].append(line.strip())
 
-        # 섹션 헤더 감지 (【】 형식 확인)
-        if '【우발' in line_clean or '【소송' in line_clean:
-            if section_content and current_section:
-                full_text = '\n'.join(section_content)
-                categories["contingent_liabilities_details"].append(full_text)
-            current_section = "contingent_liabilities"
-            section_content = []
-            continue
-        elif '【특수' in line_clean or '【관계자' in line_clean:
-            if section_content and current_section:
-                full_text = '\n'.join(section_content)
-                categories["related_party_transactions_details"].append(full_text)
-            current_section = "related_party_transactions"
-            section_content = []
-            continue
-        elif '【자산' in line_clean or '【손상' in line_clean:
-            if section_content and current_section:
-                full_text = '\n'.join(section_content)
-                categories["asset_impairment_details"].append(full_text)
-            current_section = "asset_impairment"
-            section_content = []
-            continue
-        elif '【최종' in line_clean or '【종합' in line_clean:
-            if section_content and current_section:
-                full_text = '\n'.join(section_content)
-                if '우발' in current_section:
-                    categories["contingent_liabilities_details"].append(full_text)
-                elif '특수' in current_section:
-                    categories["related_party_transactions_details"].append(full_text)
-                elif '자산' in current_section:
-                    categories["asset_impairment_details"].append(full_text)
-            current_section = "final"
-            section_content = []
-            continue
+    # 특수관계자 섹션 추출
+    if '특수' in text or '관계자' in text or '계열' in text:
+        lines = text.split('\n')
+        for line in lines:
+            if any(kw in line for kw in ['특수', '관계자', '계열', '지배', '자금']):
+                sections["related"].append(line.strip())
 
-        # 현재 섹션에 내용 추가
-        if current_section == "final":
-            # 최종 섹션 수집
-            if '투자 적격성' in line_clean or '권고' in line_clean or '판단' in line_clean:
-                categories["final_recommendation"] = line_clean[:300]
-            else:
-                section_content.append(line_clean)
-        elif current_section:
-            section_content.append(line_clean)
+    # 자산손상 섹션 추출
+    if '손상' in text or '투자손실' in text or 'M&A' in text:
+        lines = text.split('\n')
+        for line in lines:
+            if any(kw in line for kw in ['손상', '투자손실', 'M&A', '투자', '무형자산']):
+                sections["asset"].append(line.strip())
 
-    # 마지막 섹션 저장
-    if section_content and current_section:
-        full_text = '\n'.join(section_content)
-        if current_section == "contingent_liabilities":
-            categories["contingent_liabilities_details"].append(full_text)
-        elif current_section == "related_party_transactions":
-            categories["related_party_transactions_details"].append(full_text)
-        elif current_section == "asset_impairment":
-            categories["asset_impairment_details"].append(full_text)
+    # ===== 항목 개수 계산 (간단하게) =====
+    # 섹션이 존재하면 1건으로 계산 (더 정확한 계산도 가능)
+    contingent_count = 1 if sections["contingent"] else 0
+    related_count = 1 if sections["related"] else 0
+    asset_count = 1 if sections["asset"] else 0
 
-    # 간단한 항목도 추출 (호환성 유지) + 항목 개수 저장
-    for i, detail in enumerate(categories["contingent_liabilities_details"]):
-        if len(detail) > 10:
-            categories["contingent_liabilities"].append(detail[:100])
+    # 최종 평가 찾기
+    has_assessment = 1 if ('권고' in text or '투자' in text or '평가' in text) else 0
 
-    for i, detail in enumerate(categories["related_party_transactions_details"]):
-        if len(detail) > 10:
-            categories["related_party_transactions"].append(detail[:100])
+    # 결과 저장
+    if sections["contingent"]:
+        categories["contingent_liabilities"] = ['\n'.join(sections["contingent"])[:100]]
+        categories["contingent_liabilities_details"] = ['\n'.join(sections["contingent"])]
 
-    for i, detail in enumerate(categories["asset_impairment_details"]):
-        if len(detail) > 10:
-            categories["asset_impairment"].append(detail[:100])
+    if sections["related"]:
+        categories["related_party_transactions"] = ['\n'.join(sections["related"])[:100]]
+        categories["related_party_transactions_details"] = ['\n'.join(sections["related"])]
 
-    # 최종 평가 추출
-    if categories["final_recommendation"]:
-        categories["investment_assessment"] = categories["final_recommendation"]
+    if sections["asset"]:
+        categories["asset_impairment"] = ['\n'.join(sections["asset"])[:100]]
+        categories["asset_impairment_details"] = ['\n'.join(sections["asset"])]
 
-    # 명시적 항목 개수 저장 (extract_qualitative_risk_score에서 사용)
-    categories["contingent_count"] = len(categories["contingent_liabilities_details"])
-    categories["related_count"] = len(categories["related_party_transactions_details"])
-    categories["asset_count"] = len(categories["asset_impairment_details"])
-    categories["assessment_count"] = 1 if (categories["investment_assessment"] and len(categories["investment_assessment"].strip()) > 0) else 0
+    # 투자 평가
+    if has_assessment:
+        for line in text.split('\n'):
+            if any(kw in line for kw in ['권고', '투자', '평가', '결론']):
+                categories["investment_assessment"] = line.strip()[:200]
+                break
+
+    # 명시적 항목 개수 저장
+    categories["contingent_count"] = contingent_count
+    categories["related_count"] = related_count
+    categories["asset_count"] = asset_count
+    categories["assessment_count"] = has_assessment
 
     return categories
 
