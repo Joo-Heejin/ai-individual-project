@@ -690,10 +690,17 @@ def stakeholder_caveats(corp_name: str, mgmt_response: str, notes: str, analysis
 # ============================================================================
 
 def extract_risk_categories(caveats_text: str) -> dict:
+    """
+    Claude가 생성한 이해관계자 보고서에서 리스크 카테고리별 항목을 추출합니다.
+    각 항목에는 발견된 텍스트(근거)도 포함됩니다.
+    """
     categories = {
         "contingent_liabilities": [],
+        "contingent_liabilities_evidence": [],  # 근거/설명 추가
         "related_party_transactions": [],
+        "related_party_transactions_evidence": [],  # 근거/설명 추가
         "asset_impairment": [],
+        "asset_impairment_evidence": [],  # 근거/설명 추가
         "investment_assessment": ""
     }
 
@@ -707,20 +714,27 @@ def extract_risk_categories(caveats_text: str) -> dict:
     lines = caveats_text.split('\n')
 
     current_section = None
-    for line in lines:
+    previous_line = ""
+
+    for i, line in enumerate(lines):
         line_clean = line.strip()
 
         if not line_clean or len(line_clean) < 5:
             continue
 
-        if any(kw in line_clean for kw in ['우발', '소송', '분쟁']):
+        # 섹션 헤더 감지
+        if any(kw in line_clean for kw in ['우발', '소송', '분쟁', '【우발']):
             current_section = "contingent_liabilities"
-        elif any(kw in line_clean for kw in ['특수', '관계자', '계열사']):
+            continue
+        elif any(kw in line_clean for kw in ['특수', '관계자', '계열사', '【특수']):
             current_section = "related_party_transactions"
-        elif any(kw in line_clean for kw in ['손상', '투자손실', 'M&A']):
+            continue
+        elif any(kw in line_clean for kw in ['손상', '투자손실', 'M&A', '【자산']):
             current_section = "asset_impairment"
-        elif any(kw in line_clean for kw in ['최종', '권고', '평가']):
+            continue
+        elif any(kw in line_clean for kw in ['최종', '권고', '평가', '【최종', '【투자']):
             current_section = None
+            continue
 
         if current_section:
             is_content_line = (
@@ -734,21 +748,97 @@ def extract_risk_categories(caveats_text: str) -> dict:
                 if cleaned and not cleaned.startswith('['):
                     categories[current_section].append(cleaned)
 
-    if '최종' in caveats_text or '권고' in caveats_text:
-        lines_for_final = caveats_text.split('\n')
-        for i, line in enumerate(lines_for_final):
-            if any(kw in line for kw in ['최종', '권고', '투자']):
-                categories["investment_assessment"] = '\n'.join(lines_for_final[i:i+5])[:500]
-                break
+                    # 근거 추출: 다음 1-2줄에서 설명/근거 추출
+                    evidence = ""
+                    for j in range(i+1, min(i+3, len(lines))):
+                        next_line = lines[j].strip()
+                        if next_line and ('→' in next_line or '이유' in next_line or '신호' in next_line):
+                            evidence = next_line[:150]  # 첫 150자만
+                            break
 
+                    if evidence:
+                        categories[f"{current_section}_evidence"].append(evidence)
+                    else:
+                        # 근거가 없으면 자동 생성
+                        categories[f"{current_section}_evidence"].append(f"[주석에서 적발됨] {cleaned[:80]}")
+
+        # 최종 평가 섹션 추출
+        if any(kw in line_clean for kw in ['최종', '권고', '투자', '결론']):
+            if len(line_clean) > 20 and not line_clean.startswith('【'):
+                categories["investment_assessment"] = line_clean[:200]
+
+    # 중복 제거
     for key in ["contingent_liabilities", "related_party_transactions", "asset_impairment"]:
         categories[key] = list(dict.fromkeys(categories[key]))[:5]
+        categories[f"{key}_evidence"] = list(dict.fromkeys(categories[f"{key}_evidence"]))[:5]
 
     return categories
 
 # ============================================================================
 # 정성 위험도 점수 추출
 # ============================================================================
+
+def _generate_qualitative_rationale(con_count, rel_count, asset_count, has_assessment, risk_categories):
+    """정성 점수의 정당성을 설명하는 텍스트 생성"""
+
+    rationale_parts = []
+
+    # 우발채무
+    if con_count > 0:
+        con_items = risk_categories.get("contingent_liabilities", [])
+        con_evidence = risk_categories.get("contingent_liabilities_evidence", [])
+        rationale_parts.append(
+            f"**【우발채무 & 소송】** {con_count}건 적발\n"
+            f"└ {con_items[0][:80] if con_items else '소송 분쟁'}\n"
+            f"└ 근거: {con_evidence[0][:120] if con_evidence else '[주석 확인 필요]'}\n"
+            f"└ 점수 기여도: {min(con_count * 15, 45):.0f}점\n"
+        )
+
+    # 특수관계자거래
+    if rel_count > 0:
+        rel_items = risk_categories.get("related_party_transactions", [])
+        rel_evidence = risk_categories.get("related_party_transactions_evidence", [])
+        rationale_parts.append(
+            f"**【특수관계자거래】** {rel_count}건 적발\n"
+            f"└ {rel_items[0][:80] if rel_items else '관계사 거래'}\n"
+            f"└ 근거: {rel_evidence[0][:120] if rel_evidence else '[주석 확인 필요]'}\n"
+            f"└ 점수 기여도: {min(rel_count * 20, 40):.0f}점\n"
+        )
+
+    # 자산손상
+    if asset_count > 0:
+        asset_items = risk_categories.get("asset_impairment", [])
+        asset_evidence = risk_categories.get("asset_impairment_evidence", [])
+        rationale_parts.append(
+            f"**【자산손상 & 투자손실】** {asset_count}건 적발\n"
+            f"└ {asset_items[0][:80] if asset_items else '자산손상'}\n"
+            f"└ 근거: {asset_evidence[0][:120] if asset_evidence else '[주석 확인 필요]'}\n"
+            f"└ 점수 기여도: {min(asset_count * 20, 40):.0f}점\n"
+        )
+
+    # 최종평가
+    if has_assessment:
+        rationale_parts.append(
+            f"**【최종평가】** 공시 투명성 검증 완료\n"
+            f"└ 점수 기여도: 25점\n"
+        )
+
+    # 종합
+    total = min(con_count * 15, 45) + min(rel_count * 20, 40) + min(asset_count * 20, 40) + (25 if has_assessment else 0)
+    total = min(total, 100)
+
+    risk_level = "중간" if 40 <= total <= 70 else ("고" if total > 70 else "저")
+
+    rationale_parts.append(
+        f"**【종합 평가】**\n"
+        f"└ 총점: {total:.0f}점 ({risk_level}위험)\n"
+        f"└ 해석: 공시 주석에서 발견된 우발채무, 특수거래, 자산손상 등으로 인해 "
+        f"중간 수준의 정성적 리스크가 평가됨\n"
+        f"└ 주의사항: 정량 지표와 함께 종합하여 최종 판정할 것"
+    )
+
+    return "\n".join(rationale_parts)
+
 
 def extract_qualitative_risk_score(risk_categories: dict) -> dict:
     """
@@ -824,10 +914,23 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
     # 최대 100점 제한
     qualitative_risk_score = min(qualitative_risk_score, 100)
 
+    # 점수 정당성 설명 생성
+    scoring_rationale = _generate_qualitative_rationale(
+        contingent_count, related_count, asset_count, has_assessment,
+        risk_categories
+    )
+
     return {
         "qualitative_risk_score": round(qualitative_risk_score, 1),
         "risk_count": categories_with_risk,
-        "risk_breakdown": risk_breakdown
+        "risk_breakdown": risk_breakdown,
+        "scoring_details": {
+            "contingent_score": round(min(contingent_count * 15, 45), 1),
+            "related_score": round(min(related_count * 20, 40), 1),
+            "asset_score": round(min(asset_count * 20, 40), 1),
+            "assessment_score": 25 if has_assessment else 0,
+            "rationale": scoring_rationale
+        }
     }
 
 # ============================================================================
@@ -1857,11 +1960,14 @@ elif st.session_state.get("fetch_triggered", False):
 
             # 개선된 정성 점수 계산식 설명
             st.markdown("")
+            st.markdown('<div class="section-header" style="margin-top: -10px;">정성 점수 산출 근거</div>', unsafe_allow_html=True)
+
             con_liab = breakdown.get('contingent_liabilities', 0)
             rel_party = breakdown.get('related_party_transactions', 0)
             asset_imp = breakdown.get('asset_impairment', 0)
             assessment = breakdown.get('investment_assessment', 0)
 
+            # 계산식
             calc_formula = (
                 f"**📊 점수 계산식:**\n\n"
                 f"({con_liab}개 × 15점) + ({rel_party}개 × 20점) + ({asset_imp}개 × 20점) + "
@@ -1869,7 +1975,46 @@ elif st.session_state.get("fetch_triggered", False):
                 f"= {con_liab*15} + {rel_party*20} + {asset_imp*20} + {25 if assessment else 0} "
                 f"= **{qualitative_risk['qualitative_risk_score']:.1f}점**"
             )
-            st.caption(calc_formula)
+            st.markdown(calc_formula)
+
+            # 근거 상세 설명
+            if 'scoring_details' in qualitative_risk and 'rationale' in qualitative_risk['scoring_details']:
+                st.markdown("")
+                st.markdown("---")
+                st.markdown("**📌 점수별 근거 상세**\n")
+                st.markdown(qualitative_risk['scoring_details']['rationale'])
+            else:
+                # 기본 근거 표시 (scoring_details가 없는 경우)
+                st.markdown("")
+                st.markdown("**📌 리스크별 근거:**\n")
+
+                if con_liab > 0:
+                    st.markdown(f"**우발채무 & 소송 ({con_liab}건):** 총 {con_liab*15}점 기여")
+                    st.caption("└ 공시 주석에서 발견된 미결 소송, 우발채무, 담보/보증 사항 등")
+
+                if rel_party > 0:
+                    st.markdown(f"**특수관계자거래 ({rel_party}건):** 총 {rel_party*20}점 기여")
+                    st.caption("└ 지배주주/경영진과의 자금 거래, 계열사 간 부당 가격 책정 신호 등")
+
+                if asset_imp > 0:
+                    st.markdown(f"**자산손상 & 투자손실 ({asset_imp}건):** 총 {asset_imp*20}점 기여")
+                    st.caption("└ 종속기업 손상차손, M&A 자산 손상, 무형자산 가치 하락 등")
+
+                if assessment > 0:
+                    st.markdown(f"**최종 정성평가:** 25점 기여")
+                    st.caption("└ 공시 투명성 및 기업 지배구조 검증 완료")
+
+                # 결론
+                st.markdown("")
+                total_qual = qualitative_risk['qualitative_risk_score']
+                if total_qual > 70:
+                    risk_eval = "**고위험** 🔴 - 정성 리스크 상당함"
+                elif total_qual > 50:
+                    risk_eval = "**중위험** 🟠 - 정성 리스크 중간 수준"
+                else:
+                    risk_eval = "**저위험** 🟢 - 정성 리스크 낮음"
+
+                st.markdown(f"**결론:** {risk_eval}\n└ 공시 주석 검토 결과, 위와 같은 리스크 항목들이 식별되어 정성 점수 {total_qual:.1f}점으로 평가되었습니다.")
 
     # ========================================================================
     # Tab 3: 정성적 크로스체킹
