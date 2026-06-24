@@ -506,6 +506,8 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
     }
 
     detailed_analysis = {}
+    debt_ratio = None
+    current_ratio = None
 
     try:
         if financial_df is not None:
@@ -592,7 +594,9 @@ def financial_rule_engine(financial_df, analysis_dict=None) -> dict:
         "financial_risk_score": round(financial_risk_score, 1),
         "risk_level": "고위험" if financial_risk_score >= 70 else "정상",
         "component_scores": risk_scores,
-        "detailed_findings": detailed_analysis
+        "detailed_findings": detailed_analysis,
+        "debt_ratio": round(debt_ratio, 2) if debt_ratio else None,
+        "current_ratio": round(current_ratio, 2) if current_ratio else None
     }
 
 # ============================================================================
@@ -750,10 +754,12 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
     """
     Node 3의 stakeholder_caveats() 결과에서 정성 위험도 점수를 계산합니다.
 
-    계산 기준:
-    - 발견된 리스크 카테고리 개수 × 25점 (최대 100점)
-    - 4개 카테고리 가능: contingent_liabilities, related_party_transactions,
-                       asset_impairment, investment_assessment
+    개선된 계산 기준 (항목 개수 반영):
+    - 우발채무 (contingent_liabilities): 항목당 15점 (최대 45점)
+    - 특수관계자거래 (related_party_transactions): 항목당 20점 (최대 40점)
+    - 자산손상 (asset_impairment): 항목당 20점 (최대 40점)
+    - 투자 평가 (investment_assessment): 25점 (있으면 25, 없으면 0)
+    - 총 최대 100점 (다양한 점수 생성 가능)
 
     Args:
         risk_categories: {
@@ -765,9 +771,9 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
 
     Returns:
         {
-            "qualitative_risk_score": int (0-100),     # 정성 위험도 점수
-            "risk_count": int,                         # 발견된 리스크 카테고리 개수
-            "risk_breakdown": {                        # 카테고리별 발견 항목 개수
+            "qualitative_risk_score": float (0-100),     # 정성 위험도 점수 (다양한 값)
+            "risk_count": int,                           # 발견된 리스크 카테고리 개수
+            "risk_breakdown": {                          # 카테고리별 발견 항목 개수
                 "contingent_liabilities": int,
                 "related_party_transactions": int,
                 "asset_impairment": int,
@@ -778,29 +784,48 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
 
     risk_breakdown = {}
     categories_with_risk = 0
+    qualitative_risk_score = 0
 
-    # 3개 주요 카테고리 검사 (리스트 기반)
-    for category_key in ["contingent_liabilities", "related_party_transactions", "asset_impairment"]:
-        items = risk_categories.get(category_key, [])
-        item_count = len(items) if items else 0
-        risk_breakdown[category_key] = item_count
+    # 우발채무 (contingent_liabilities): 항목당 15점 (최대 45점)
+    contingent_items = risk_categories.get("contingent_liabilities", [])
+    contingent_count = len(contingent_items) if contingent_items else 0
+    risk_breakdown["contingent_liabilities"] = contingent_count
+    contingent_score = min(contingent_count * 15, 45)
+    qualitative_risk_score += contingent_score
+    if contingent_count > 0:
+        categories_with_risk += 1
 
-        if item_count > 0:
-            categories_with_risk += 1
+    # 특수관계자거래 (related_party_transactions): 항목당 20점 (최대 40점)
+    related_items = risk_categories.get("related_party_transactions", [])
+    related_count = len(related_items) if related_items else 0
+    risk_breakdown["related_party_transactions"] = related_count
+    related_score = min(related_count * 20, 40)
+    qualitative_risk_score += related_score
+    if related_count > 0:
+        categories_with_risk += 1
 
-    # 투자 평가 카테고리 검사 (텍스트 기반)
+    # 자산손상 (asset_impairment): 항목당 20점 (최대 40점)
+    asset_items = risk_categories.get("asset_impairment", [])
+    asset_count = len(asset_items) if asset_items else 0
+    risk_breakdown["asset_impairment"] = asset_count
+    asset_score = min(asset_count * 20, 40)
+    qualitative_risk_score += asset_score
+    if asset_count > 0:
+        categories_with_risk += 1
+
+    # 투자 평가 (investment_assessment): 25점 (텍스트 있으면 추가)
     assessment = risk_categories.get("investment_assessment", "")
     has_assessment = 1 if (assessment and len(assessment.strip()) > 0) else 0
     risk_breakdown["investment_assessment"] = has_assessment
-
     if has_assessment > 0:
+        qualitative_risk_score += 25
         categories_with_risk += 1
 
-    # 정성 위험도 점수: 카테고리 개수 × 25점 (최대 100점)
-    qualitative_risk_score = min(categories_with_risk * 25, 100)
+    # 최대 100점 제한
+    qualitative_risk_score = min(qualitative_risk_score, 100)
 
     return {
-        "qualitative_risk_score": qualitative_risk_score,
+        "qualitative_risk_score": round(qualitative_risk_score, 1),
         "risk_count": categories_with_risk,
         "risk_breakdown": risk_breakdown
     }
@@ -1399,7 +1424,17 @@ elif st.session_state.get("fetch_triggered", False):
                 st.caption(f"📐 우발채무 & 소송: {con_liab}개")
                 st.caption(f"📐 특수관계자거래: {rel_party}개")
                 st.caption(f"📐 자산손상: {asset_imp}개")
-                st.caption(f"💡 계산: {qualitative_risk['risk_count']} × 25 = {qualitative_risk['qualitative_risk_score']:.1f}점")
+
+                # 개선된 점수 계산식 설명
+                assessment = breakdown.get('investment_assessment', 0)
+                calc_details = (
+                    f"💡 **점수 계산식:**\n"
+                    f"   ({con_liab}개 × 15) + ({rel_party}개 × 20) + ({asset_imp}개 × 20) + "
+                    f"(평가{'있음' if assessment else '없음'}: {25 if assessment else 0}점)\n"
+                    f"   = {con_liab*15} + {rel_party*20} + {asset_imp*20} + {25 if assessment else 0} "
+                    f"= **{qualitative_risk['qualitative_risk_score']:.1f}점**"
+                )
+                st.caption(calc_details)
 
         st.markdown("")
         st.markdown("---")
@@ -1610,6 +1645,52 @@ elif st.session_state.get("fetch_triggered", False):
         st.markdown("")
         st.markdown("---")
 
+        # 안정성 지표 섹션 (부채비율, 유동비율)
+        st.markdown('<div class="section-header">안정성 지표</div>', unsafe_allow_html=True)
+
+        col_stability1, col_stability2 = st.columns(2)
+
+        with col_stability1:
+            with st.container(border=True):
+                st.markdown("### 부채비율 (Debt Ratio)")
+                debt_ratio_value = analysis.get('debt_ratio')
+                if debt_ratio_value is not None:
+                    st.metric(
+                        "비율",
+                        f"{debt_ratio_value:.2f}%",
+                        help="부채 / 자기자본 × 100\n낮을수록 좋음\n일반적 정상범위: 100-200%"
+                    )
+                    if debt_ratio_value > 200:
+                        st.error("부채비율이 높은 수준입니다. 부채 관리 개선이 필요합니다.")
+                    elif debt_ratio_value > 160:
+                        st.warning("부채비율이 주의 수준입니다.")
+                    else:
+                        st.success("부채비율이 정상 수준입니다.")
+                else:
+                    st.caption("💡 재무 데이터를 조회하지 못했습니다.")
+
+        with col_stability2:
+            with st.container(border=True):
+                st.markdown("### 유동비율 (Current Ratio)")
+                current_ratio_value = analysis.get('current_ratio')
+                if current_ratio_value is not None:
+                    st.metric(
+                        "비율",
+                        f"{current_ratio_value:.2f}%",
+                        help="유동자산 / 유동부채 × 100\n높을수록 좋음\n일반적 정상범위: 100% 이상"
+                    )
+                    if current_ratio_value < 100:
+                        st.error("유동비율이 낮아 단기유동성이 부족합니다.")
+                    elif current_ratio_value < 150:
+                        st.warning("유동비율이 주의 수준입니다.")
+                    else:
+                        st.success("유동비율이 양호한 수준입니다.")
+                else:
+                    st.caption("💡 재무 데이터를 조회하지 못했습니다.")
+
+        st.markdown("")
+        st.markdown("---")
+
         # 수익성 지표 섹션
         st.markdown('<div class="section-header">수익성 지표</div>', unsafe_allow_html=True)
 
@@ -1773,6 +1854,22 @@ elif st.session_state.get("fetch_triggered", False):
             with col_breakdown2:
                 st.caption(f"• 자산손상 & 투자손실: {breakdown.get('asset_impairment', 0)}개")
                 st.caption(f"• 최종 평가: {'있음' if breakdown.get('investment_assessment', 0) else '없음'}")
+
+            # 개선된 정성 점수 계산식 설명
+            st.markdown("")
+            con_liab = breakdown.get('contingent_liabilities', 0)
+            rel_party = breakdown.get('related_party_transactions', 0)
+            asset_imp = breakdown.get('asset_impairment', 0)
+            assessment = breakdown.get('investment_assessment', 0)
+
+            calc_formula = (
+                f"**📊 점수 계산식:**\n\n"
+                f"({con_liab}개 × 15점) + ({rel_party}개 × 20점) + ({asset_imp}개 × 20점) + "
+                f"(평가{'있음' if assessment else '없음'}: {25 if assessment else 0}점)\n\n"
+                f"= {con_liab*15} + {rel_party*20} + {asset_imp*20} + {25 if assessment else 0} "
+                f"= **{qualitative_risk['qualitative_risk_score']:.1f}점**"
+            )
+            st.caption(calc_formula)
 
     # ========================================================================
     # Tab 3: 정성적 크로스체킹
