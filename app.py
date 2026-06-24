@@ -2097,6 +2097,76 @@ elif st.session_state.get("fetch_triggered", False):
                 st.markdown("### 정성적 검증")
                 st.markdown(caveats)
 
+        # ========================================================================
+        # 추가: 정성 가중치 민감도 분석
+        # ========================================================================
+        st.markdown("")
+        st.markdown("---")
+        st.markdown('<div class="section-header">정성 가중치 민감도 분석</div>', unsafe_allow_html=True)
+
+        st.markdown("""
+        **정성 가중치 변화에 따른 최종 등급의 변화를 분석합니다.**
+        ```
+        최종 점수 = (정량 × (1-w)) + (정성 × w)
+        ```
+        """)
+
+        # 현재 상황
+        col_s1, col_s2, col_s3 = st.columns(3)
+
+        fin_score = analysis['financial_risk_score']
+        qual_score = qualitative_risk['qualitative_risk_score']
+
+        with col_s1:
+            with st.container(border=True):
+                st.metric("정량 점수", f"{fin_score:.1f}")
+
+        with col_s2:
+            with st.container(border=True):
+                st.metric("정성 점수", f"{qual_score:.1f}")
+
+        with col_s3:
+            with st.container(border=True):
+                st.metric("현재 최종점수 (40%)", f"{final_risk['final_integrated_score']:.1f}")
+
+        st.markdown("")
+
+        # 민감도 테이블
+        sensitivity_data = []
+        for w in range(0, 101, 10):
+            final_score = (fin_score * (1 - w/100)) + (qual_score * (w/100))
+            if final_score > 70:
+                grade = "🔴 고위험"
+            elif final_score > 50:
+                grade = "🟠 중위험"
+            else:
+                grade = "🟢 저위험"
+            sensitivity_data.append({"정성%": f"{w}%", "정량%": f"{100-w}%", "최종점수": f"{final_score:.1f}", "등급": grade})
+
+        import pandas as pd
+        st.dataframe(pd.DataFrame(sensitivity_data), use_container_width=True, hide_index=True)
+
+        # 임계점
+        st.markdown("")
+        col_t1, col_t2 = st.columns(2)
+
+        if qual_score != fin_score:
+            threshold_medium = (50 - fin_score) / (qual_score - fin_score)
+            threshold_high = (70 - fin_score) / (qual_score - fin_score)
+
+            with col_t1:
+                with st.container(border=True):
+                    st.metric("저→중 임계점", f"{threshold_medium*100:.1f}%")
+                    st.caption("이 가중치 이상 시 중위험 진입")
+
+            with col_t2:
+                with st.container(border=True):
+                    if threshold_high <= 1.0:
+                        st.metric("중→고 임계점", f"{threshold_high*100:.1f}%")
+                    else:
+                        st.metric("고위험 진입", "불가능")
+                    st.caption("정성값 < 70점이므로 불가능" if threshold_high > 1.0 else "")
+
     # ========================================================================
     # Tab 4: 리스크 시나리오 분석
     # ========================================================================
