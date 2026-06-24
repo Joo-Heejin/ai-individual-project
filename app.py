@@ -784,22 +784,28 @@ def extract_risk_categories(caveats_text: str) -> dict:
         elif current_section == "asset_impairment":
             categories["asset_impairment_details"].append(full_text)
 
-    # 간단한 항목도 추출 (호환성 유지)
-    for detail in categories["contingent_liabilities_details"]:
+    # 간단한 항목도 추출 (호환성 유지) + 항목 개수 저장
+    for i, detail in enumerate(categories["contingent_liabilities_details"]):
         if len(detail) > 10:
             categories["contingent_liabilities"].append(detail[:100])
 
-    for detail in categories["related_party_transactions_details"]:
+    for i, detail in enumerate(categories["related_party_transactions_details"]):
         if len(detail) > 10:
             categories["related_party_transactions"].append(detail[:100])
 
-    for detail in categories["asset_impairment_details"]:
+    for i, detail in enumerate(categories["asset_impairment_details"]):
         if len(detail) > 10:
             categories["asset_impairment"].append(detail[:100])
 
     # 최종 평가 추출
     if categories["final_recommendation"]:
         categories["investment_assessment"] = categories["final_recommendation"]
+
+    # 명시적 항목 개수 저장 (extract_qualitative_risk_score에서 사용)
+    categories["contingent_count"] = len(categories["contingent_liabilities_details"])
+    categories["related_count"] = len(categories["related_party_transactions_details"])
+    categories["asset_count"] = len(categories["asset_impairment_details"])
+    categories["assessment_count"] = 1 if (categories["investment_assessment"] and len(categories["investment_assessment"].strip()) > 0) else 0
 
     return categories
 
@@ -920,16 +926,10 @@ def _generate_qualitative_rationale(con_count, rel_count, asset_count, has_asses
         interpretation = "공시 주석상 정성 리스크는 낮은 수준으로 평가됩니다."
 
     rationale_parts.append(
-        f"\n{'='*70}\n"
-        f"**【종합 분석 결론】**\n\n"
+        f"\n**【종합 분석 결론】**\n\n"
         f"📊 정성 리스크 총점: **{total:.0f}/100점** ({risk_level})\n\n"
         f"📋 해석:\n"
-        f"{interpretation}\n\n"
-        f"💡 주의사항:\n"
-        f"본 정성 점수는 공시 주석 분석 결과이며, "
-        f"정량 지표(부채비율, 유동비율, 수익성 등)와 함께 종합하여 "
-        f"최종 투자 판정을 내려야 합니다.\n"
-        f"{'='*70}"
+        f"{interpretation}"
     )
 
     return "\n".join(rationale_parts)
@@ -971,9 +971,13 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
     categories_with_risk = 0
     qualitative_risk_score = 0
 
+    # 명시적 항목 개수 사용 (extract_risk_categories에서 저장함)
+    contingent_count = risk_categories.get("contingent_count", 0)
+    related_count = risk_categories.get("related_count", 0)
+    asset_count = risk_categories.get("asset_count", 0)
+    has_assessment = risk_categories.get("assessment_count", 0)
+
     # 우발채무 (contingent_liabilities): 항목당 15점 (최대 45점)
-    contingent_items = risk_categories.get("contingent_liabilities", [])
-    contingent_count = len(contingent_items) if contingent_items else 0
     risk_breakdown["contingent_liabilities"] = contingent_count
     contingent_score = min(contingent_count * 15, 45)
     qualitative_risk_score += contingent_score
@@ -981,8 +985,6 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
         categories_with_risk += 1
 
     # 특수관계자거래 (related_party_transactions): 항목당 20점 (최대 40점)
-    related_items = risk_categories.get("related_party_transactions", [])
-    related_count = len(related_items) if related_items else 0
     risk_breakdown["related_party_transactions"] = related_count
     related_score = min(related_count * 20, 40)
     qualitative_risk_score += related_score
@@ -990,8 +992,6 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
         categories_with_risk += 1
 
     # 자산손상 (asset_impairment): 항목당 20점 (최대 40점)
-    asset_items = risk_categories.get("asset_impairment", [])
-    asset_count = len(asset_items) if asset_items else 0
     risk_breakdown["asset_impairment"] = asset_count
     asset_score = min(asset_count * 20, 40)
     qualitative_risk_score += asset_score
@@ -999,8 +999,6 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
         categories_with_risk += 1
 
     # 투자 평가 (investment_assessment): 25점 (텍스트 있으면 추가)
-    assessment = risk_categories.get("investment_assessment", "")
-    has_assessment = 1 if (assessment and len(assessment.strip()) > 0) else 0
     risk_breakdown["investment_assessment"] = has_assessment
     if has_assessment > 0:
         qualitative_risk_score += 25
