@@ -971,11 +971,13 @@ def extract_qualitative_risk_score(risk_categories: dict) -> dict:
     categories_with_risk = 0
     qualitative_risk_score = 0
 
-    # 명시적 항목 개수 사용 (extract_risk_categories에서 저장함)
-    contingent_count = risk_categories.get("contingent_count", 0)
-    related_count = risk_categories.get("related_count", 0)
-    asset_count = risk_categories.get("asset_count", 0)
-    has_assessment = risk_categories.get("assessment_count", 0)
+    # 항목 개수 계산: _details 리스트의 길이 또는 명시적 저장값 사용
+    contingent_count = risk_categories.get("contingent_count") or len(risk_categories.get("contingent_liabilities_details", []))
+    related_count = risk_categories.get("related_count") or len(risk_categories.get("related_party_transactions_details", []))
+    asset_count = risk_categories.get("asset_count") or len(risk_categories.get("asset_impairment_details", []))
+
+    assessment_text = risk_categories.get("investment_assessment", "") or risk_categories.get("final_recommendation", "")
+    has_assessment = 1 if (assessment_text and len(assessment_text.strip()) > 0) else 0
 
     # 우발채무 (contingent_liabilities): 항목당 15점 (최대 45점)
     risk_breakdown["contingent_liabilities"] = contingent_count
