@@ -4,7 +4,7 @@ AI를 활용한 기업 리스크 평가 시스템으로, **정량 분석 + 정�
 
 ---
 
-## 🏗️ 기술 아키텍처
+## 🏗️ 기술 아키텍처 (고수준)
 
 ```mermaid
 graph TD
@@ -24,6 +24,75 @@ graph TD
     style D fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000
     style E fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
     style F fill:#f1f8e9,stroke:#33691e,stroke-width:1px,color:#000
+```
+
+---
+
+## 🔄 상세 데이터 플로우 (기업명 입력 → 최종 산출)
+
+```mermaid
+graph TD
+    Start["👤 사용자 입력<br/>기업명 입력"]
+    
+    Start -->|클릭: 분석| Step1["🔍 Step 1: 기업 검색<br/>search_company<br/>DART API로 기업명 검색"]
+    
+    Step1 -->|기업코드 획득| Step2["📋 Step 2: 공시 조회<br/>get_periodic_report<br/>최근 정기 공시 조회<br/>공시번호, 공시일 획득"]
+    
+    Step2 -->|공시번호 확보| Step3["📊 Step 3: 재무 데이터 추출<br/>extract_financial_statement<br/>재무제표에서 핵심 지표<br/>매출, 유동자산, 부채 등"]
+    
+    Step2 -->|공시번호 확보| Step4["📝 Step 4: 주석 추출<br/>extract_notes<br/>정성 위험 정보 수집<br/>경영진 설명, 주의사항"]
+    
+    Step3 -->|재무 데이터| Step5["🔢 Step 5: 정량 분석<br/>financial_rule_engine<br/>매출 변동성 40%<br/>유동성 지표 35%<br/>부채 비율 25%<br/>→ 정량 점수 산출"]
+    
+    Step4 -->|주석 정보| Step6A["🤖 Step 6-1: 경영진 설명 분석<br/>management_explanations<br/>Claude LLM이 기업 상황 재검증"]
+    
+    Step4 -->|주석 정보| Step6B["🤖 Step 6-2: 정성 위험 분석<br/>stakeholder_caveats<br/>Claude LLM이 이해관계자<br/>주의사항 종합 평가"]
+    
+    Step6A -->|분석 결과| Step7["🎯 Step 7: 위험 범주 추출<br/>extract_risk_categories<br/>위험 유형 자동 분류<br/>• 연관성 위험<br/>• 자산 건전성<br/>• 평가 위험"]
+    
+    Step6B -->|분석 결과| Step7
+    
+    Step5 -->|정량 점수| Step8["📈 Step 8: 정성 점수 계산<br/>extract_qualitative_risk_score<br/>범주별 점수화<br/>정성 위험도 산출"]
+    
+    Step7 -->|범주 정보| Step8
+    
+    Step8 -->|정성 점수| Step9["✅ Step 9: 최종 통합<br/>integrate_final_risk_grade<br/>정량 + 정성 통합<br/>최종 등급 산출<br/>HIGH / MEDIUM / LOW"]
+    
+    Step5 -->|정량 데이터| Step10["📊 Step 10: 5년 추세 조회<br/>get_financial_risk_trend<br/>5년 역사적 위험도 변화<br/>추세 시각화"]
+    
+    Step5 -->|정량 데이터| Step11["⚡ Step 11: 시나리오 테스트<br/>scenario_stress_test<br/>4가지 위기 시나리오<br/>• 경기 침체<br/>• 금리 인상<br/>• 원자재 가격 상승<br/>• 산업 구조 변화"]
+    
+    Step9 -->|최종 결과| Output1["📌 Tab 1: 종합 리스크 대시보드<br/>• 최종 등급 (HIGH/MEDIUM/LOW)<br/>• 최종 점수 (0~100)<br/>• 기업 기본 정보"]
+    
+    Step8 -->|정성 분석| Output2["📌 Tab 2: 정량 재무 분석<br/>• 매출 변동성 점수<br/>• 유동성 지표 점수<br/>• 부채 비율 점수<br/>• 차트 시각화"]
+    
+    Step7 -->|위험 범주| Output3["📌 Tab 3: 정성적 크로스체킹<br/>• 위험 범주별 상세 분석<br/>• Claude LLM 판정 이유<br/>• 강점/약점 분석"]
+    
+    Step10 -->|추세 데이터| Output4["📌 Tab 4: 리스크 시나리오<br/>• 5년 추세 그래프<br/>• 4가지 시나리오 영향도<br/>• 민감도 분석"]
+    
+    Output1 -->|렌더링| Final["🎯 최종 산출물<br/>Streamlit 웹 대시보드<br/>4개 탭 동시 표시"]
+    Output2 --> Final
+    Output3 --> Final
+    Output4 --> Final
+    
+    style Start fill:#fff9c4,stroke:#f57f17,stroke-width:3px,color:#000
+    style Step1 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000
+    style Step2 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000
+    style Step3 fill:#f3e5f5,stroke:#512da8,stroke-width:2px,color:#000
+    style Step4 fill:#f3e5f5,stroke:#512da8,stroke-width:2px,color:#000
+    style Step5 fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    style Step6A fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    style Step6B fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    style Step7 fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    style Step8 fill:#f1f8e9,stroke:#558b2f,stroke-width:2px,color:#000
+    style Step9 fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000
+    style Step10 fill:#f3e5f5,stroke:#512da8,stroke-width:2px,color:#000
+    style Step11 fill:#f3e5f5,stroke:#512da8,stroke-width:2px,color:#000
+    style Output1 fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+    style Output2 fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+    style Output3 fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+    style Output4 fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+    style Final fill:#e0f2f1,stroke:#00695c,stroke-width:3px,color:#000
 ```
 
 ---
