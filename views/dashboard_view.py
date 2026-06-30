@@ -256,7 +256,7 @@ def render_dashboard():
 
     with col1:
         st.markdown(f"""
-        <div style="background-color: #f8fafb; border-left: 4px solid #4a90a4; padding: 16px; border-radius: 8px; margin: 10px 0;">
+        <div style="background-color: #f8fafb; border-left: 4px solid #2d6a4f; padding: 16px; border-radius: 8px; margin: 10px 0;">
             <h4 style="color: #1b4332; margin-top: 0;">📊 정량 분석</h4>
             <p style="color: #555;"><strong>종합 위험도:</strong> {analysis['financial_risk_score']:.1f}/100</p>
             <p style="color: #555; margin: 8px 0;"><strong>세부 지표:</strong></p>
@@ -270,7 +270,7 @@ def render_dashboard():
 
     with col2:
         st.markdown(f"""
-        <div style="background-color: #f8fafb; border-left: 4px solid #a46c4a; padding: 16px; border-radius: 8px; margin: 10px 0;">
+        <div style="background-color: #f8fafb; border-left: 4px solid #2d6a4f; padding: 16px; border-radius: 8px; margin: 10px 0;">
             <h4 style="color: #1b4332; margin-top: 0;">📋 정성 분석</h4>
             <p style="color: #555;"><strong>종합 위험도:</strong> {qualitative_risk['qualitative_risk_score']:.1f}/100</p>
             <p style="color: #555; margin: 8px 0;"><strong>발견 내역:</strong></p>
@@ -281,3 +281,150 @@ def render_dashboard():
             </ul>
         </div>
         """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ========================================================================
+    # 가중치 민감도 분석
+    # ========================================================================
+
+    show_section_header("⚖️ 가중치 민감도 분석")
+
+    st.markdown("이 기업의 리스크 등급이 정량·정성 가중치 변화에 따라 어떻게 변하는지 탐색해보세요.")
+    st.markdown("")
+
+    # 슬라이더: 정량 가중치 조절
+    quant_weight = st.slider(
+        "정량 리스크 가중치",
+        min_value=0,
+        max_value=100,
+        value=60,
+        step=5,
+        help="정량 리스크의 가중치를 설정하면 정성 리스크는 자동으로 연동됩니다."
+    )
+    qual_weight = 100 - quant_weight
+
+    # 실시간 점수 계산
+    adjusted_final_score = (
+        analysis['financial_risk_score'] * (quant_weight / 100) +
+        qualitative_risk['qualitative_risk_score'] * (qual_weight / 100)
+    )
+
+    # 등급 판정
+    if adjusted_final_score >= 70:
+        adjusted_grade = "고위험"
+        grade_emoji = "🔴"
+    elif adjusted_final_score >= 40:
+        adjusted_grade = "중위험"
+        grade_emoji = "🟡"
+    else:
+        adjusted_grade = "저위험"
+        grade_emoji = "🟢"
+
+    # 기본 설정 비교
+    baseline_score = final_risk['final_integrated_score']
+    baseline_grade = final_risk['grade_label']
+
+    # 결과 표시 (균형잡힌 카드)
+    st.markdown(f"**현재 설정: 정량 {quant_weight}% : 정성 {qual_weight}%**")
+    st.markdown("")
+
+    col1, col2, col3 = st.columns(3, gap="small")
+
+    with col1:
+        with st.container(border=True):
+            st.markdown(f"<p style='font-size: 0.85em; color: #888; margin: 0;'>종합 점수</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 1.6em; font-weight: bold; color: #1b4332; margin: 5px 0;'>{adjusted_final_score:.1f}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 0.8em; color: #666; margin: 0;'>/100점</p>", unsafe_allow_html=True)
+
+    with col2:
+        with st.container(border=True):
+            st.markdown(f"<p style='font-size: 0.85em; color: #888; margin: 0;'>등급</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 1.8em; font-weight: bold; margin: 2px 0;'>{grade_emoji}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 0.9em; color: #333; margin: 0;'>{adjusted_grade}</p>", unsafe_allow_html=True)
+
+    with col3:
+        with st.container(border=True):
+            st.markdown(f"<p style='font-size: 0.85em; color: #888; margin: 0;'>기본 설정 대비</p>", unsafe_allow_html=True)
+            if adjusted_grade == baseline_grade:
+                st.markdown(f"<p style='font-size: 1.2em; font-weight: bold; color: #2d6a4f; margin: 5px 0;'>✅ 유지</p>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<p style='font-size: 1.2em; font-weight: bold; color: #d62828; margin: 5px 0;'>⚠️ 변경</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 0.85em; color: #555; margin: 0;'>{baseline_grade} → {adjusted_grade}</p>", unsafe_allow_html=True)
+
+    st.markdown("")
+
+    # 시뮬레이션 그래프
+    st.markdown("### 📊 가중치 민감도 그래프")
+
+    import pandas as pd
+
+    weights = list(range(0, 101, 5))
+    scores = []
+
+    for w in weights:
+        score = (
+            analysis['financial_risk_score'] * (w / 100) +
+            qualitative_risk['qualitative_risk_score'] * ((100 - w) / 100)
+        )
+        scores.append(score)
+
+    df = pd.DataFrame({
+        '정량 리스크 가중치 (%)': weights,
+        '최종 위험도 점수': scores
+    })
+
+    st.line_chart(
+        df.set_index('정량 리스크 가중치 (%)'),
+        height=350,
+        use_container_width=True
+    )
+
+    st.markdown("")
+
+    # 통합 리포트 문단
+    quant_score = analysis['financial_risk_score']
+    qual_score = qualitative_risk['qualitative_risk_score']
+    score_diff = abs(quant_score - qual_score)
+
+    # 민감도 판정 및 통합 문단 생성
+    if quant_score > qual_score:
+        integrated_report = f"""
+본 시뮬레이션 그래프는 정량 리스크 가중치(X축) 변화에 따른 최종 위험도 점수(Y축)의 추이를 나타냅니다.
+
+{st.session_state.corp_name_result}은 현재 정량 위험도({quant_score:.1f}점)가 정성 위험도({qual_score:.1f}점)보다
+{score_diff:.1f}점 높아, **정량 리스크에 더 민감하게 반응**하는 구조를 보이고 있습니다.
+
+따라서 정량 리스크의 가중치를 낮출수록(그래프의 왼쪽으로 이동) 최종 종합 점수가 개선됩니다.
+즉, 매출질, 유동성, 부채 등 재무 지표를 개선하면 전체 리스크 등급을 효과적으로 낮출 수 있습니다.
+        """
+        recommendation = "재무 건전성 강화를 통한 정량 지표 개선에 우선순위를 두세요."
+    elif qual_score > quant_score:
+        integrated_report = f"""
+본 시뮬레이션 그래프는 정량 리스크 가중치(X축) 변화에 따른 최종 위험도 점수(Y축)의 추이를 나타냅니다.
+
+{st.session_state.corp_name_result}은 현재 정성 위험도({qual_score:.1f}점)가 정량 위험도({quant_score:.1f}점)보다
+{score_diff:.1f}점 높아, **정성 리스크에 더 민감하게 반응**하는 구조를 보이고 있습니다.
+
+따라서 정성 리스크의 가중치를 낮출수록(그래프의 오른쪽으로 이동) 최종 종합 점수가 개선됩니다.
+즉, 공시 투명성 개선, 우발채무 해소, 특수거래 축소 등 거버넌스 강화를 통해 리스크를 낮춰야 합니다.
+        """
+        recommendation = "기업 거버넌스 및 공시 투명성 강화에 우선순위를 두세요."
+    else:
+        integrated_report = f"""
+본 시뮬레이션 그래프는 정량 리스크 가중치(X축) 변화에 따른 최종 위험도 점수(Y축)의 추이를 나타냅니다.
+
+{st.session_state.corp_name_result}은 정량 위험도({quant_score:.1f}점)와 정성 위험도({qual_score:.1f}점)가
+유사한 수준으로, **정량과 정성 리스크가 균형잡힌 구조**를 보이고 있습니다.
+
+따라서 정량과 정성 양쪽 리스크를 병행하여 개선해야 전체 리스크를 효과적으로 낮울 수 있습니다.
+재무 지표 개선과 거버넌스 강화를 동시에 추진하는 균형잡힌 전략이 필요합니다.
+        """
+        recommendation = "재무 개선과 거버넌스 강화를 균형있게 추진하세요."
+
+    st.markdown(integrated_report)
+
+    st.markdown("")
+
+    # 최종 권고사항 - 강조 박스
+    st.warning(f"🎯 **권고사항**: {recommendation}")
