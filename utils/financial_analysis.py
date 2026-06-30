@@ -8,6 +8,72 @@ from typing import Optional, Dict, Any
 import pandas as pd
 
 
+def get_current_ratio_status(current_ratio: Optional[float]) -> Dict[str, str]:
+    """유동비율 상태 평가 (3단계)"""
+    if current_ratio is None:
+        return {"status": "데이터 없음", "status_ko": "데이터 없음", "emoji": "❓"}
+
+    if current_ratio >= 150:
+        return {"status": "정상", "status_ko": "정상", "emoji": "🟢", "description": "단기 채무 지급 능력 양호"}
+    elif current_ratio >= 100:
+        return {"status": "주의", "status_ko": "주의", "emoji": "🟡", "description": "단기 유동성 개선 필요"}
+    else:
+        return {"status": "경고", "status_ko": "경고", "emoji": "🔴", "description": "단기 유동성 긴급 상태"}
+
+
+def get_debt_ratio_status(debt_ratio: Optional[float]) -> Dict[str, str]:
+    """부채비율 상태 평가 (3단계)"""
+    if debt_ratio is None:
+        return {"status": "데이터 없음", "status_ko": "데이터 없음", "emoji": "❓"}
+
+    if debt_ratio <= 100:
+        return {"status": "정상", "status_ko": "정상", "emoji": "🟢", "description": "재무 레버리지 양호"}
+    elif debt_ratio <= 200:
+        return {"status": "주의", "status_ko": "주의", "emoji": "🟡", "description": "부채 수준 주의 필요"}
+    else:
+        return {"status": "경고", "status_ko": "경고", "emoji": "🔴", "description": "부채 과다 상태"}
+
+
+def get_revenue_quality_status(revenue_quality_score: float) -> Dict[str, str]:
+    """매출 질 점수 상태 평가 (3단계)"""
+    if revenue_quality_score <= 30:
+        return {"status": "양호", "status_ko": "양호", "emoji": "🟢", "description": "현금 창출 능력 우수"}
+    elif revenue_quality_score <= 60:
+        return {"status": "주의", "status_ko": "주의", "emoji": "🟡", "description": "개선 필요"}
+    else:
+        return {"status": "경고", "status_ko": "경고", "emoji": "🔴", "description": "매출 질 악화"}
+
+
+def get_liquidity_stress_status(liquidity_score: float) -> Dict[str, str]:
+    """유동성 점수 상태 평가 (3단계)"""
+    if liquidity_score <= 30:
+        return {"status": "양호", "status_ko": "양호", "emoji": "🟢", "description": "유동성 안정"}
+    elif liquidity_score <= 60:
+        return {"status": "주의", "status_ko": "주의", "emoji": "🟡", "description": "개선 필요"}
+    else:
+        return {"status": "경고", "status_ko": "경고", "emoji": "🔴", "description": "유동성 악화"}
+
+
+def get_leverage_risk_status(leverage_score: float) -> Dict[str, str]:
+    """부채 점수 상태 평가 (3단계)"""
+    if leverage_score <= 30:
+        return {"status": "양호", "status_ko": "양호", "emoji": "🟢", "description": "부채 관리 우수"}
+    elif leverage_score <= 60:
+        return {"status": "주의", "status_ko": "주의", "emoji": "🟡", "description": "개선 필요"}
+    else:
+        return {"status": "경고", "status_ko": "경고", "emoji": "🔴", "description": "부채 위험"}
+
+
+def get_overall_risk_status(risk_score: float) -> Dict[str, str]:
+    """종합 위험도 상태 평가"""
+    if risk_score < 40:
+        return {"status": "우수", "status_ko": "우수", "emoji": "🟢", "description": "재무 건전"}
+    elif risk_score < 70:
+        return {"status": "양호", "status_ko": "양호", "emoji": "🟡", "description": "주의 필요"}
+    else:
+        return {"status": "위험", "status_ko": "위험", "emoji": "🔴", "description": "개선 시급"}
+
+
 def find_account_value(data: Any, keywords: list) -> Optional[float]:
     """
     DataFrame 또는 dict에서 키워드 기반으로 계정값을 찾습니다.
@@ -155,20 +221,63 @@ def financial_rule_engine(financial_df: Optional[pd.DataFrame], analysis_dict: O
         risk_scores["liquidity_stress"] = 40
         risk_scores["leverage_risk"] = 40
 
-    # === 3단계: 종합 점수 계산 ===
+    # === 4단계: 수익성 지표 계산 (ROE, ROA) ===
+    roe = None
+    roa = None
+
+    try:
+        if financial_df is not None:
+            net_income = find_account_value(financial_df, ['당기순이익', '순이익', 'net_income'])
+            total_equity = find_account_value(financial_df, ['자본총계', '자본', '총자본', 'total_equity', 'equity'])
+            total_assets = find_account_value(financial_df, ['자산총계', '총자산', 'total_assets', 'assets'])
+
+            if net_income and total_equity and total_equity > 0:
+                roe = (net_income / total_equity) * 100
+
+            if net_income and total_assets and total_assets > 0:
+                roa = (net_income / total_assets) * 100
+
+            if roe:
+                detailed_analysis["roe_value"] = f"ROE(자기자본이익률): {roe:.2f}%"
+            if roa:
+                detailed_analysis["roa_value"] = f"ROA(총자산이익률): {roa:.2f}%"
+    except:
+        pass
+
+    # === 5단계: 상태 평가 ===
+    current_ratio_rounded = round(current_ratio, 1) if current_ratio else None
+    debt_ratio_rounded = round(debt_ratio, 1) if debt_ratio else None
+
+    current_ratio_status = get_current_ratio_status(current_ratio_rounded)
+    debt_ratio_status = get_debt_ratio_status(debt_ratio_rounded)
+    revenue_quality_status = get_revenue_quality_status(risk_scores["revenue_quality"])
+    liquidity_stress_status = get_liquidity_stress_status(risk_scores["liquidity_stress"])
+    leverage_risk_status = get_leverage_risk_status(risk_scores["leverage_risk"])
+
+    # === 6단계: 종합 점수 계산 ===
     financial_risk_score = (
         risk_scores["revenue_quality"] * 0.40 +
         risk_scores["liquidity_stress"] * 0.35 +
         risk_scores["leverage_risk"] * 0.25
     )
 
+    overall_risk_status = get_overall_risk_status(financial_risk_score)
+
     return {
         "financial_risk_score": round(financial_risk_score, 1),
         "risk_level": "고위험" if financial_risk_score >= 70 else "정상",
         "component_scores": risk_scores,
         "detailed_findings": detailed_analysis,
-        "debt_ratio": round(debt_ratio, 2) if debt_ratio else None,
-        "current_ratio": round(current_ratio, 2) if current_ratio else None
+        "debt_ratio": debt_ratio_rounded,
+        "current_ratio": current_ratio_rounded,
+        "current_ratio_status": current_ratio_status,
+        "debt_ratio_status": debt_ratio_status,
+        "revenue_quality_status": revenue_quality_status,
+        "liquidity_stress_status": liquidity_stress_status,
+        "leverage_risk_status": leverage_risk_status,
+        "overall_risk_status": overall_risk_status,
+        "roe": round(roe, 2) if roe else None,
+        "roa": round(roa, 2) if roa else None
     }
 
 

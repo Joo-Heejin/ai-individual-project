@@ -26,20 +26,20 @@ def render_qualitative():
 
     qualitative_risk = st.session_state.qualitative_risk
     qual_score = qualitative_risk['qualitative_risk_score']
+    breakdown = qualitative_risk['risk_breakdown']
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
         with st.container(border=True):
-            st.metric("종합 점수", f"{qual_score:.1f}/100")
-            st.caption(f"리스크 카테고리: {qualitative_risk['risk_count']}개")
+            st.metric("종합 점수", f"{qual_score:.1f}")
+            st.caption("리스크 카테고리")
 
     with col2:
         with st.container(border=True):
-            breakdown = qualitative_risk['risk_breakdown']
             contingent = breakdown.get('contingent_liabilities', 0)
             st.metric("우발채무", f"{contingent}개")
-            st.caption("소송/법적 리스크")
+            st.caption("소송/법적")
 
     with col3:
         with st.container(border=True):
@@ -47,18 +47,17 @@ def render_qualitative():
             st.metric("특수거래", f"{related}개")
             st.caption("관계자 거래")
 
-    col4, col5 = st.columns(2)
-
     with col4:
         with st.container(border=True):
             asset = breakdown.get('asset_impairment', 0)
             st.metric("자산손상", f"{asset}개")
-            st.caption("M&A/투자손실")
+            st.caption("M&A/손실")
 
     with col5:
         with st.container(border=True):
             assessment = breakdown.get('investment_assessment', 0)
             st.metric("최종평가", "포함" if assessment else "미포함")
+            st.caption("투자평가")
 
     st.markdown("")
 
