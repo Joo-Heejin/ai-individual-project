@@ -463,3 +463,73 @@ def extract_qualitative_risk_score(risk_categories: Dict) -> Dict:
             "rationale": scoring_rationale
         }
     }
+
+
+def generate_final_report_paragraph(
+    corp_name: str,
+    final_risk: Dict,
+    analysis: Dict,
+    qualitative_risk: Dict,
+    llm: ChatAnthropic
+) -> str:
+    """
+    정량 + 정성 데이터를 통합하여 전문 투자 분석가 스타일의 최종 판정 문단을 생성합니다.
+
+    Args:
+        corp_name: 기업명
+        final_risk: integrate_final_risk_grade() 결과
+        analysis: financial_rule_engine() 결과
+        qualitative_risk: extract_qualitative_risk_score() 결과
+        llm: ChatAnthropic LLM 인스턴스
+
+    Returns:
+        최종 판정 문단 (한국어 줄글 형식)
+    """
+    quant_score = analysis.get('financial_risk_score', 0)
+    qual_score = qualitative_risk.get('qualitative_risk_score', 0)
+    final_score = final_risk.get('final_integrated_score', 0)
+    grade = final_risk.get('grade_label', '미분류')
+
+    # 정량 분석 요약
+    component = analysis.get('component_scores', {})
+    revenue = component.get('revenue_quality', 0)
+    liquidity = component.get('liquidity_stress', 0)
+    leverage = component.get('leverage_risk', 0)
+
+    # 정성 분석 요약
+    risk_breakdown = qualitative_risk.get('risk_breakdown', {})
+    contingent_count = risk_breakdown.get('contingent_liabilities', 0)
+    related_count = risk_breakdown.get('related_party_transactions', 0)
+    asset_count = risk_breakdown.get('asset_impairment', 0)
+
+    prompt = f"""당신은 전문 투자 분석가입니다. 다음 정량·정성 데이터를 바탕으로
+{corp_name}의 최종 리스크 판정을 하나의 자연스러운 한국어 문단(줄글)으로 작성해주세요.
+
+【정량 분석 결과】
+- 종합 위험도 점수: {quant_score:.1f}/100
+- 매출채권 회전율 위험: {revenue:.0f}/100
+- 유동비율 위험: {liquidity:.0f}/100
+- 부채비율 위험: {leverage:.0f}/100
+
+【정성 분석 결과】
+- 종합 위험도 점수: {qual_score:.1f}/100
+- 우발채무/소송 리스크: {contingent_count}건
+- 특수관계자거래 리스크: {related_count}건
+- 자산손상 리스크: {asset_count}건
+
+【최종 판정】
+- 통합 점수: {final_score:.1f}/100
+- 등급: {grade}
+
+지침:
+1. 투자 분석가의 전문적이고 균형잡힌 톤으로 작성
+2. 정량 강점과 정성 약점을 자연스럽게 연결
+3. 예: "(기업명)은 정량적으로 ~한 강점을 보이나, 정성적으로 ~한 리스크가 관측되어 최종 ~등급으로 판정되었습니다."
+4. 구체적 수치는 반드시 포함
+5. 불릿 포인트나 기호 없이 순수 문단 형식만 사용
+6. 2-3개 문장의 자연스러운 흐름으로 작성
+
+응답은 문단만 반환하세요 (추가 설명 없음)."""
+
+    response = llm.invoke(prompt)
+    return response.content.strip()

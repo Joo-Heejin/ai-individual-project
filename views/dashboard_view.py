@@ -7,6 +7,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from utils.ui_helpers import show_section_header
+from utils.qualitative_analysis import generate_final_report_paragraph
 
 
 def render_dashboard():
@@ -178,14 +179,6 @@ def render_dashboard():
 
             st.plotly_chart(fig, use_container_width=True)
 
-            st.markdown("**연도별 상세 데이터:**")
-            trend_table = []
-            for year in valid_years:
-                score = trend_scores.get(year)
-                trend_table.append({"연도": year, "위험도": f"{score:.1f}/100"})
-
-            st.dataframe(trend_table, use_container_width=True, hide_index=True)
-
             st.markdown("**추세 분석:**")
             if len(scores) > 1:
                 latest = scores[-1]
@@ -215,27 +208,76 @@ def render_dashboard():
 
     show_section_header("📋 최종 판정 근거")
 
-    with st.expander("정량 분석 상세 내용", expanded=False):
+    with st.spinner("최종 판정 근거 분석 중..."):
+        try:
+            # LLM 객체 확인
+            if "llm" not in st.session_state:
+                raise ValueError("LLM 객체가 초기화되지 않았습니다.")
+
+            # LLM으로 최종 판정 근거 문단 생성
+            final_report = generate_final_report_paragraph(
+                st.session_state.corp_name_result,
+                final_risk,
+                analysis,
+                qualitative_risk,
+                st.session_state.llm
+            )
+
+            # 깔끔한 보고서 스타일로 표시 (토글/개조식 없음)
+            st.markdown(f"""
+            <div style="background-color: #f8fafb; border-left: 4px solid #2d6a4f; padding: 20px; border-radius: 8px; margin: 20px 0; line-height: 1.8;">
+                <p style="font-size: 1.05em; color: #1b4332; margin: 0; font-family: 'Noto Sans KR', sans-serif;">
+                    {final_report}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        except Exception as e:
+            st.warning(f"분석 중 오류: {str(e)}")
+            st.markdown(f"""
+            <div style="background-color: #f8fafb; border-left: 4px solid #2d6a4f; padding: 20px; border-radius: 8px; margin: 20px 0; line-height: 1.8;">
+                <p style="font-size: 1.05em; color: #1b4332; margin: 0;">
+                    {st.session_state.corp_name_result}은(는) 정량적으로 {analysis['financial_risk_score']:.1f}/100의 위험도를 보이며,
+                    정성적으로는 {qualitative_risk['qualitative_risk_score']:.1f}/100의 리스크가 확인되었습니다.
+                    이를 통합하여 최종 {final_risk['grade_label']} 등급으로 판정되었습니다.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("")
+
+    # ========================================================================
+    # 세부 분석 지표 (바로 보여주기)
+    # ========================================================================
+
+    show_section_header("🔍 세부 분석 지표")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
         st.markdown(f"""
-        **정량 분석 구성:**
-        - 매출채권 회전율 (40% 가중치)
-        - 유동비율 (35% 가중치)
-        - 부채비율 (25% 가중치)
+        <div style="background-color: #f8fafb; border-left: 4px solid #4a90a4; padding: 16px; border-radius: 8px; margin: 10px 0;">
+            <h4 style="color: #1b4332; margin-top: 0;">📊 정량 분석</h4>
+            <p style="color: #555;"><strong>종합 위험도:</strong> {analysis['financial_risk_score']:.1f}/100</p>
+            <p style="color: #555; margin: 8px 0;"><strong>세부 지표:</strong></p>
+            <ul style="color: #555; margin: 5px 0;">
+                <li>매출채권 회전율: {analysis['component_scores']['revenue_quality']:.0f}/100</li>
+                <li>유동비율: {analysis['component_scores']['liquidity_stress']:.0f}/100</li>
+                <li>부채비율: {analysis['component_scores']['leverage_risk']:.0f}/100</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
 
-        **판정 기준:**
-        - 위험도 > 70: 고위험
-        - 50 < 위험도 ≤ 70: 중위험
-        - 위험도 ≤ 50: 저위험
-        """)
-
-        if analysis.get('detailed_findings'):
-            st.markdown("**세부 분석 결과:**")
-            for key, value in analysis['detailed_findings'].items():
-                st.caption(f"• {value}")
-
-    with st.expander("정성 분석 상세 내용", expanded=False):
-        scoring_details = qualitative_risk.get('scoring_details', {})
-        rationale = scoring_details.get('rationale', '')
-
-        if rationale:
-            st.markdown(rationale)
+    with col2:
+        st.markdown(f"""
+        <div style="background-color: #f8fafb; border-left: 4px solid #a46c4a; padding: 16px; border-radius: 8px; margin: 10px 0;">
+            <h4 style="color: #1b4332; margin-top: 0;">📋 정성 분석</h4>
+            <p style="color: #555;"><strong>종합 위험도:</strong> {qualitative_risk['qualitative_risk_score']:.1f}/100</p>
+            <p style="color: #555; margin: 8px 0;"><strong>발견 내역:</strong></p>
+            <ul style="color: #555; margin: 5px 0;">
+                <li>우발채무/소송: {qualitative_risk['risk_breakdown'].get('contingent_liabilities', 0)}건</li>
+                <li>특수거래: {qualitative_risk['risk_breakdown'].get('related_party_transactions', 0)}건</li>
+                <li>자산손상: {qualitative_risk['risk_breakdown'].get('asset_impairment', 0)}건</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
