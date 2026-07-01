@@ -1,5 +1,4 @@
 dart-fss
-git+https://github.com/financedata/opendartreader.git
 python-dotenv
 pandas
 beautifulsoup4
