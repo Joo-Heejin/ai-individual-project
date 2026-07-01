@@ -14,19 +14,27 @@ from typing import TypedDict
 # UTF-8 인코딩 설정
 sys.stdout.reconfigure(encoding='utf-8')
 
-# 환경변수 로드
+# 환경변수 로드 (로컬 개발용)
 load_dotenv(".env")
 
-# ✅ Streamlit Cloud Secrets 지원: st.secrets → os.environ 복사
-# 배포 환경에서는 .env 파일이 없으므로, st.secrets에서 읽어서 os.environ에 설정
-try:
-    if "DART_API_KEY" in st.secrets:
-        os.environ["DART_API_KEY"] = st.secrets["DART_API_KEY"]
-    if "ANTHROPIC_API_KEY" in st.secrets:
-        os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
-except Exception:
-    # st.secrets가 없는 경우 (로컬 실행) 무시
-    pass
+# ✅ Streamlit Cloud Secrets 지원
+# 배포 환경의 st.secrets를 os.environ으로 복사 (최우선)
+def setup_secrets():
+    """Streamlit Cloud Secrets를 환경변수로 설정"""
+    try:
+        # Streamlit Cloud의 Secrets 접근 (배포 환경)
+        for key in ["DART_API_KEY", "ANTHROPIC_API_KEY"]:
+            try:
+                value = st.secrets.get(key)
+                if value:
+                    os.environ[key] = value
+            except:
+                pass
+    except:
+        pass
+
+# 초기화 시점에 Secrets 설정
+setup_secrets()
 
 # UI 헬퍼 임포트
 from utils.ui_helpers import setup_page_config, apply_custom_css, initialize_session_state

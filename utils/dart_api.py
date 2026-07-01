@@ -29,6 +29,15 @@ def init_dart_api() -> Any:
         ValueError: DART_API_KEY가 설정되지 않은 경우
     """
     dart_api_key = os.getenv("DART_API_KEY")
+
+    # Streamlit Cloud의 Secrets에서도 시도
+    if not dart_api_key:
+        try:
+            import streamlit as st
+            dart_api_key = st.secrets.get("DART_API_KEY")
+        except:
+            pass
+
     if not dart_api_key:
         raise ValueError("❌ DART_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
