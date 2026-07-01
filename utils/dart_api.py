@@ -9,7 +9,13 @@ import re
 from typing import Optional, Tuple, Any
 import pandas as pd
 from datetime import datetime
-import OpenDartReader
+
+# ✅ OpenDartReader 동적 import
+try:
+    import OpenDartReader
+except ImportError:
+    # Streamlit Cloud에서 설치 실패 시 대체
+    import dart_fss as OpenDartReader
 
 
 def init_dart_api() -> Any:
