@@ -55,37 +55,40 @@ def search_company(dart_module: Any, company_name: str) -> Tuple[Optional[str], 
         (corp_code, corp_name) 튜플 또는 (None, None)
     """
     try:
-        # dart-fss의 search API 사용
-        results = dart_module.search(company_name)
+        # dart-fss의 get_corp_list()로 모든 기업 조회
+        all_corps = dart_module.get_corp_list()
 
-        if not results or len(results) == 0:
+        if not all_corps or len(all_corps) == 0:
             return None, None
 
         corp_info = None
 
         # 1. 상장사(corp_cls == 'Y') 중 정확히 매치
-        for result in results:
-            if result.get('corp_cls') == 'Y' and result.get('corp_name') == company_name:
-                corp_info = result
+        for corp in all_corps:
+            if corp.get('corp_cls') == 'Y' and corp.get('corp_name') == company_name:
+                corp_info = corp
                 break
 
-        # 2. 상장사 중 첫 번째
+        # 2. 상장사 중 부분 매치 (첫 번째)
         if not corp_info:
-            for result in results:
-                if result.get('corp_cls') == 'Y':
-                    corp_info = result
+            for corp in all_corps:
+                if corp.get('corp_cls') == 'Y' and company_name in corp.get('corp_name', ''):
+                    corp_info = corp
                     break
 
         # 3. 정확히 매치 (비상장사 포함)
         if not corp_info:
-            for result in results:
-                if result.get('corp_name') == company_name:
-                    corp_info = result
+            for corp in all_corps:
+                if corp.get('corp_name') == company_name:
+                    corp_info = corp
                     break
 
-        # 4. 그냥 첫 번째
-        if not corp_info and len(results) > 0:
-            corp_info = results[0]
+        # 4. 부분 매치 (비상장사 포함)
+        if not corp_info:
+            for corp in all_corps:
+                if company_name in corp.get('corp_name', ''):
+                    corp_info = corp
+                    break
 
         if corp_info:
             return corp_info.get('corp_code'), corp_info.get('corp_name')
