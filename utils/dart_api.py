@@ -70,20 +70,43 @@ def search_company(dart: Any, company_name: str) -> Tuple[Optional[str], Optiona
     """
     try:
         results = dart.company_by_name(company_name)
-        if not results:
+        if not results or (isinstance(results, list) and len(results) == 0):
             return None, None
 
+        # 결과가 dict 형태면 리스트로 변환
+        if isinstance(results, dict):
+            results = [results]
+
         corp_info = None
+
+        # 1. 상장사 중에서 정확히 매치되는 것 찾기
         for result in results:
-            if result.get('corp_cls') == 'Y':
+            if result.get('corp_cls') == 'Y' and result.get('corp_name') == company_name:
                 corp_info = result
                 break
 
+        # 2. 상장사 중 첫 번째
+        if not corp_info:
+            for result in results:
+                if result.get('corp_cls') == 'Y':
+                    corp_info = result
+                    break
+
+        # 3. 비상장사 중 정확히 매치
+        if not corp_info:
+            for result in results:
+                if result.get('corp_name') == company_name:
+                    corp_info = result
+                    break
+
+        # 4. 그냥 첫 번째
         if not corp_info:
             corp_info = results[0]
 
-        return corp_info['corp_code'], corp_info['corp_name']
-    except:
+        return corp_info.get('corp_code'), corp_info.get('corp_name')
+    except Exception as e:
+        import sys
+        print(f"search_company 에러: {e}", file=sys.stderr)
         return None, None
 
 
