@@ -1,5 +1,5 @@
 dart-fss
-opendartreader
+OpenDartReader
 python-dotenv
 pandas
 beautifulsoup4
