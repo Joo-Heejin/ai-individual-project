@@ -12,10 +12,19 @@ from datetime import datetime
 
 # ✅ OpenDartReader 동적 import
 try:
-    import OpenDartReader
+    from OpenDartReader.dart import OpenDartReader
 except ImportError:
-    # Streamlit Cloud에서 설치 실패 시 대체
-    import dart_fss as OpenDartReader
+    try:
+        # 다른 버전의 경우
+        from OpenDartReader import OpenDartReader
+    except ImportError:
+        # 마지막 수단: dart-fss 사용
+        import dart_fss
+        class OpenDartReader:
+            """dart-fss를 래핑한 OpenDartReader 호환 클래스"""
+            def __init__(self, api_key):
+                dart_fss.set_api_key(api_key)
+                self._dart = dart_fss
 
 
 def init_dart_api() -> Any:
