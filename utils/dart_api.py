@@ -9,22 +9,7 @@ import re
 from typing import Optional, Tuple, Any
 import pandas as pd
 from datetime import datetime
-
-# ✅ OpenDartReader 동적 import
-try:
-    from OpenDartReader.dart import OpenDartReader
-except ImportError:
-    try:
-        # 다른 버전의 경우
-        from OpenDartReader import OpenDartReader
-    except ImportError:
-        # 마지막 수단: dart-fss 사용
-        import dart_fss
-        class OpenDartReader:
-            """dart-fss를 래핑한 OpenDartReader 호환 클래스"""
-            def __init__(self, api_key):
-                dart_fss.set_api_key(api_key)
-                self._dart = dart_fss
+import dart_fss as dart
 
 
 def init_dart_api() -> Any:
@@ -51,35 +36,34 @@ def init_dart_api() -> Any:
         raise ValueError("❌ DART_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
     try:
-        return OpenDartReader(dart_api_key)
+        dart.set_api_key(dart_api_key)
+        return dart
     except Exception as e:
-        raise ValueError(f"❌ OpenDartReader 초기화 실패: {e}")
+        raise ValueError(f"❌ DART API 초기화 실패: {e}")
 
 
-def search_company(dart: Any, company_name: str) -> Tuple[Optional[str], Optional[str]]:
+def search_company(dart_module: Any, company_name: str) -> Tuple[Optional[str], Optional[str]]:
     """
-    기업명으로 검색하여 기업 코드 반환
+    기업명으로 검색하여 기업 코드 반환 (dart-fss 사용)
     상장사를 우선 선택하고 없으면 첫 번째 결과 반환
 
     Args:
-        dart: OpenDartReader 인스턴스
+        dart_module: dart_fss 모듈
         company_name: 검색할 기업명
 
     Returns:
         (corp_code, corp_name) 튜플 또는 (None, None)
     """
     try:
-        results = dart.company_by_name(company_name)
-        if not results or (isinstance(results, list) and len(results) == 0):
-            return None, None
+        # dart-fss의 search API 사용
+        results = dart_module.search(company_name)
 
-        # 결과가 dict 형태면 리스트로 변환
-        if isinstance(results, dict):
-            results = [results]
+        if not results or len(results) == 0:
+            return None, None
 
         corp_info = None
 
-        # 1. 상장사 중에서 정확히 매치되는 것 찾기
+        # 1. 상장사(corp_cls == 'Y') 중 정확히 매치
         for result in results:
             if result.get('corp_cls') == 'Y' and result.get('corp_name') == company_name:
                 corp_info = result
@@ -92,7 +76,7 @@ def search_company(dart: Any, company_name: str) -> Tuple[Optional[str], Optiona
                     corp_info = result
                     break
 
-        # 3. 비상장사 중 정확히 매치
+        # 3. 정확히 매치 (비상장사 포함)
         if not corp_info:
             for result in results:
                 if result.get('corp_name') == company_name:
@@ -100,13 +84,14 @@ def search_company(dart: Any, company_name: str) -> Tuple[Optional[str], Optiona
                     break
 
         # 4. 그냥 첫 번째
-        if not corp_info:
+        if not corp_info and len(results) > 0:
             corp_info = results[0]
 
-        return corp_info.get('corp_code'), corp_info.get('corp_name')
+        if corp_info:
+            return corp_info.get('corp_code'), corp_info.get('corp_name')
+        return None, None
+
     except Exception as e:
-        import sys
-        print(f"search_company 에러: {e}", file=sys.stderr)
         return None, None
 
 
