@@ -10,5 +10,6 @@ langchain
 langchain-anthropic
 openai
 streamlit
+plotly
 reportlab
 Pillow
