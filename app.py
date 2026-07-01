@@ -186,6 +186,7 @@ def perform_analysis():
 # ============================================================================
 # 메인 로직
 # ============================================================================
+# Force reload: 2026-07-01 14:00 - CDIA Framework with dynamic Action Plan
 
 if not st.session_state.get("analysis_complete", False):
     # === 초기 화면 ===
