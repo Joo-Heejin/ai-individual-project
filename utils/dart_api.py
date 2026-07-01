@@ -56,6 +56,7 @@ def search_company(dart_module: Any, company_name: str) -> Tuple[Optional[str], 
     """
     try:
         # dart-fss의 get_corp_list()로 모든 기업 조회
+        # 결과는 Corp 객체 리스트 (dict가 아님)
         all_corps = dart_module.get_corp_list()
 
         if not all_corps or len(all_corps) == 0:
@@ -65,33 +66,45 @@ def search_company(dart_module: Any, company_name: str) -> Tuple[Optional[str], 
 
         # 1. 상장사(corp_cls == 'Y') 중 정확히 매치
         for corp in all_corps:
-            if corp.get('corp_cls') == 'Y' and corp.get('corp_name') == company_name:
-                corp_info = corp
-                break
+            try:
+                if corp.corp_cls == 'Y' and corp.corp_name == company_name:
+                    corp_info = corp
+                    break
+            except:
+                pass
 
         # 2. 상장사 중 부분 매치 (첫 번째)
         if not corp_info:
             for corp in all_corps:
-                if corp.get('corp_cls') == 'Y' and company_name in corp.get('corp_name', ''):
-                    corp_info = corp
-                    break
+                try:
+                    if corp.corp_cls == 'Y' and company_name in corp.corp_name:
+                        corp_info = corp
+                        break
+                except:
+                    pass
 
         # 3. 정확히 매치 (비상장사 포함)
         if not corp_info:
             for corp in all_corps:
-                if corp.get('corp_name') == company_name:
-                    corp_info = corp
-                    break
+                try:
+                    if corp.corp_name == company_name:
+                        corp_info = corp
+                        break
+                except:
+                    pass
 
         # 4. 부분 매치 (비상장사 포함)
         if not corp_info:
             for corp in all_corps:
-                if company_name in corp.get('corp_name', ''):
-                    corp_info = corp
-                    break
+                try:
+                    if company_name in corp.corp_name:
+                        corp_info = corp
+                        break
+                except:
+                    pass
 
         if corp_info:
-            return corp_info.get('corp_code'), corp_info.get('corp_name')
+            return corp_info.corp_code, corp_info.corp_name
         return None, None
 
     except Exception as e:
