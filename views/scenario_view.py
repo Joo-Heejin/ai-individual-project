@@ -146,6 +146,15 @@ def render_scenarios():
         with st.spinner("소비재 산업 스트레스 테스트 실행 중..."):
             result = scenario_stress_test(financial_data, selected_scenario)
 
+        # Session state에 결과 저장 (PDF 다운로드용)
+        st.session_state.scenario_result = result
+
+        # 시뮬레이션 분석 결과 텍스트 저장
+        st.session_state.scenario_narrative = result.get('narrative_result', '')
+
+        # 기업 맞춤형 Action Plan 저장
+        st.session_state.action_plan_text = result.get('action_plan', '')
+
         scenario_name = result.get('scenario_name', '')
         scenario_desc = result.get('scenario_description', '')
         narrative = result.get('narrative_result', '')

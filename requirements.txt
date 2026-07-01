@@ -9,3 +9,5 @@ langchain
 langchain-anthropic
 openai
 streamlit
+reportlab
+Pillow

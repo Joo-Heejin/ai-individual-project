@@ -9,6 +9,7 @@ import sys
 import streamlit as st
 from dotenv import load_dotenv
 import concurrent.futures
+from typing import TypedDict
 
 # UTF-8 인코딩 설정
 sys.stdout.reconfigure(encoding='utf-8')
@@ -41,7 +42,45 @@ from utils.qualitative_analysis import (
     extract_qualitative_risk_score
 )
 from utils.risk_scoring import integrate_final_risk_grade, get_financial_risk_trend
+from utils.pdf_generator import generate_risk_report_pdf
 from langchain_anthropic import ChatAnthropic
+
+
+# ============================================================================
+# TypedDict: PDF 리포트 데이터 구조 정의
+# ============================================================================
+class ReportDataDict(TypedDict, total=False):
+    """
+    PDF 생성에 필요한 모든 필드를 정의합니다.
+
+    필수 필드:
+    - corp_name: 기업명
+    - report_date: 보고서 작성 일자
+    - final_risk_score: 최종 위험 점수 (0~100)
+    - final_risk_level: 최종 위험 등급 ("저위험"/"중위험"/"고위험")
+    - final_risk_grade: 위험 등급 코드 ("LOW_RISK"/"MEDIUM_RISK"/"HIGH_RISK")
+    - component_scores: 정량 분석 세부 점수
+    - current_ratio: 유동비율
+    - debt_ratio: 부채비율
+    - risk_categories: 정성 리스크 카테고리
+    - qualitative_risk_score: 정성 위험도 점수
+    - scenario_result: 시나리오 분석 결과
+    - scenario_narrative: 시나리오 서술형 분석
+    - action_plan_text: 기업 맞춤형 액션 플랜
+    """
+    corp_name: str
+    report_date: str
+    final_risk_score: float
+    final_risk_level: str
+    final_risk_grade: str
+    component_scores: dict
+    current_ratio: float
+    debt_ratio: float
+    risk_categories: dict
+    qualitative_risk_score: float
+    scenario_result: dict
+    scenario_narrative: str
+    action_plan_text: str
 
 
 # ============================================================================
@@ -186,7 +225,7 @@ def perform_analysis():
 # ============================================================================
 # 메인 로직
 # ============================================================================
-# Force reload: 2026-07-01 14:00 - CDIA Framework with dynamic Action Plan
+# Force reload: 2026-07-01 14:30 - PDF Report Generation System integrated
 
 if not st.session_state.get("analysis_complete", False):
     # === 초기 화면 ===
@@ -243,6 +282,73 @@ else:
         st.session_state.analysis_complete = False
         st.session_state.company_name = ""
         st.rerun()
+
+    st.sidebar.markdown("---")
+
+    # === PDF 다운로드 버튼 (안전한 데이터 바인딩) ===
+    # 완전한 분석 데이터가 있을 때만 버튼 표시
+    if all([
+        st.session_state.get('corp_name_result'),
+        st.session_state.get('final_risk'),
+        st.session_state.get('analysis'),
+        st.session_state.get('qualitative_risk')
+    ]):
+        st.sidebar.markdown("<hr style='margin: 10px 0;' />", unsafe_allow_html=True)
+
+        # ✅ 최종 위험도 데이터 키 매핑
+        # integrate_final_risk_grade()의 반환값:
+        # - final_integrated_score → final_risk_score (PDF에서 사용)
+        # - grade_label → final_risk_level (PDF에서 사용)
+        # - final_risk_grade → final_risk_grade (변경 없음)
+        final_risk_data = st.session_state.final_risk
+
+        # 현재 화면의 모든 데이터를 딕셔너리로 캡처
+        report_data: ReportDataDict = {
+            "corp_name": st.session_state.corp_name_result,
+            "report_date": st.session_state.report_date,
+            # ✅ 수정된 키 매핑 (핵심!)
+            "final_risk_score": final_risk_data.get('final_integrated_score', 0),
+            "final_risk_level": final_risk_data.get('grade_label', '미판정'),
+            "final_risk_grade": final_risk_data.get('final_risk_grade', '미판정'),
+            "component_scores": st.session_state.analysis.get('component_scores', {}),
+            "current_ratio": st.session_state.analysis.get('current_ratio', 0),
+            "debt_ratio": st.session_state.analysis.get('debt_ratio', 0),
+            "risk_categories": st.session_state.qualitative_risk.get('risk_categories', {}),
+            "qualitative_risk_score": st.session_state.qualitative_risk.get('qualitative_risk_score', 0),
+            "scenario_result": st.session_state.get('scenario_result'),
+            "scenario_narrative": st.session_state.get('scenario_narrative', ''),
+            "action_plan_text": st.session_state.get('action_plan_text', ''),
+        }
+
+        # 📊 [검증] 대시보드와 PDF의 최종 등급/점수 일치 확인
+        st.sidebar.write("---")
+        st.sidebar.caption("🔍 **데이터 검증:**")
+        st.sidebar.caption(f"• 점수: {report_data['final_risk_score']:.1f}/100")
+        st.sidebar.caption(f"• 등급: {report_data['final_risk_level']}")
+        st.sidebar.caption(f"• 코드: {report_data['final_risk_grade']}")
+
+        # PDF 생성 함수 (Re-run 안전성 확보)
+        def generate_pdf_safe():
+            try:
+                return generate_risk_report_pdf(report_data)
+            except Exception as e:
+                st.sidebar.error(f"❌ PDF 생성 오류: {str(e)}")
+                return None
+
+        pdf_bytes = generate_pdf_safe()
+
+        if pdf_bytes:
+            st.sidebar.download_button(
+                label="📄 경영진 보고용 종합 리스크 리포트 (.pdf)",
+                data=pdf_bytes,
+                file_name=f"{report_data['corp_name']}_리스크진단보고서_{report_data['report_date']}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+            st.sidebar.caption("✅ 대시보드 데이터 완벽 연동됨")
+    else:
+        st.sidebar.info("📌 기업 검색 및 분석을 먼저 완료해주세요.")
 
     # === 4개 탭 구조 ===
     tab1, tab2, tab3, tab4 = st.tabs([
