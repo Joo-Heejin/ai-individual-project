@@ -16,7 +16,7 @@ from typing import TypedDict, Optional, Tuple
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langchain_anthropic import ChatAnthropic
-from opendartreader import OpenDartReader
+from OpenDartReader import OpenDartReader
 import pandas as pd
 from datetime import datetime
 
