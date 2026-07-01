@@ -9,7 +9,7 @@ import re
 from typing import Optional, Tuple, Any
 import pandas as pd
 from datetime import datetime
-import OpenDartReader
+from opendartreader import OpenDartReader
 
 
 def init_dart_api() -> Any:
